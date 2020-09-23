@@ -26,17 +26,27 @@ function generateranges(numxrange)
     return xrange, yrange
 end
 
-function plotmandelbulb(xrange, yrange, numiters::Integer, plot=true, showaxis=true)
+function plotmandelbulb(xrange, yrange, numiters::Integer, savename::AbstractString) #, plot=true, showaxis=true)
     complexrange = [Complex{Float64}(x, y) for x in xrange, y in yrange]
     mandelbrotupto(z) = 1 - mandelbrot(z, numiters) / numiters
     mandelbrotimg = mandelbrotupto.(complexrange)
-    if plot
-        scene = Makie.image(xrange, yrange, mandelbrotimg, show_axis=showaxis, scale_plot=false)
-        return mandelbrotimg, scene
-    else
-        return mandelbrotimg
-    end
+
+    return mandelbrotimg
+    #if plot
+        #scene = Makie.image(xrange, yrange, mandelbrotimg, show_axis=showaxis, scale_plot=false)
+        #return mandelbrotimg, scene
+    #else
+        #return mandelbrotimg
+    #end
 
 end
 
+function rendermandelbulbpng(xrange, yrange, numiters::Integer, savename::AbstractString) #, plot=true, showaxis=true)
+    mandelbrotimg = zeros(UInt8, yrange.len, xrange.len)
+    for (j, y) in enumerate(yrange), (i, x) in enumerate(xrange)
+        mandelxy = 255 * (1 - mandelbrot(Complex{Float64}(x, y), numiters) / numiters)
+        mandelbrotimg[j, i] = UInt8(floor(mandelxy))
+    end
+    save(savename, mandelbrotimg)
+end
 
