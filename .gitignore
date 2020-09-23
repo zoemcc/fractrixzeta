@@ -23,14 +23,4 @@ docs/site/
 # environment.
 Manifest.toml
 
-
-ddg_docs/*
-meshes/*
-videos/*
-
-TODO.txt
-
-!meshes/original/small_bunny.ply
-!videos/generated/bunnydance.mp4
-!videos/mixed/bunnyrun.mp4
-!videos/audio/umbrella_run_sound_2.wav
+images
