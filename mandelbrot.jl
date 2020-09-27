@@ -102,7 +102,7 @@ function examplesettings()
     scalefactorend = 4.0
     height = 360
     numiters = 40
-    fps = 20
+    fps = 10
     seconds = 10.0
     aspectratio = 16/9
     scene = Makie.Scene()
@@ -110,6 +110,7 @@ function examplesettings()
     image = Makie.image!(scene, xrange, yrange, mandelimg, show_axis=false)
     #image = rendermandelbrotimageanimation(image, centerx, centery, scalefactorstart, scalefactorend, numiters, fps, seconds, height, aspectratio)
     return centerx, centery, scalefactorstart, scalefactorend, height, numiters, fps, seconds, aspectratio, image
+    # centerx, centery, scalefactorstart, scalefactorend, height, numiters, fps, seconds, aspectratio, image = examplesettings(); image
 end
 
 function rendermandelbrotimageanimation(image, centerx::Number, centery::Number, scalefactorstart::Number,
@@ -121,10 +122,74 @@ function rendermandelbrotimageanimation(image, centerx::Number, centery::Number,
         xrange, yrange, mandelimg = rendermandelbrotimagecuda(centerx, centery, scalefactor, numiters, height, aspectratio) 
         image.plots[1][:image][] = mandelimg
         #Makie.update!(image)
-        sleep(1/fps)
+        sleep(0.0001)
     end
     return image
 end
+
+function rendermandelbrotimageanimation2(image, centerx::Number, centery::Number, scalefactorstart::Number,
+     scalefactorend::Number, numiters::Integer, fps::Integer, seconds::Number, height::Integer, aspectratio::Number, savename::AbstractString)
+    time = 0:1/fps:seconds
+    numsteps = length(time)
+    width = Int(floor(aspectratio * height))
+
+    escape = CUDA.fill(0.0, width, height)
+
+    N = width * height
+    #numblocks = ceil(Int, N/32)
+    numthreads = (16, 16)
+    numblocks = ceil(Int, width / numthreads[1]), ceil(Int, height / numthreads[2])
+    #@show numblocks
+    #for (i, t) in enumerate(time)
+    Makie.record(image, savename, enumerate(time); framerate=60) do (i, t)
+        #CUDA.fill!(escape, 0.0)
+        scalefactor = (scalefactorend - scalefactorstart) * (t / seconds) + scalefactorstart 
+
+        expscale = 2 ^ -scalefactor
+        yrangeextent = expscale
+        xrangeextent = expscale * aspectratio
+        xstart = centerx - xrangeextent / 2
+        ystart = centery - yrangeextent / 2
+        
+        CUDA.@sync begin
+            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeextent, numiters, height, width, aspectratio)
+        end
+        image.plots[1][:image][] = Array(escape)
+        #Makie.update!(image)
+
+        #@show escape
+        sleep(0.0001)
+    end
+    @show length(time)
+    return escape
+end
+
+function mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeextent, numiters, height, width, aspectratio)
+    indexx = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    indexy = (blockIdx().y - 1) * blockDim().y + threadIdx().y
+    stridex = blockDim().x * gridDim().x
+    stridey = blockDim().y * gridDim().y
+    #@cuprintln("thread $indexx, $indexy, block $stridex, $stridey")
+    #@cuprintln("thread $indexx, $indexy")
+    for i in indexx:stridex:width, j in indexy:stridey:height
+        x_ij = (i - 1) / (width - 1) * xrangeextent + xstart
+        y_ij = (j - 1) / (height - 1) * yrangeextent + ystart
+        z_ij = ComplexF64(x_ij, y_ij)
+        @inbounds escape[i, j] += mandelbrot(z_ij, numiters) / numiters
+    end
+    return
+
+end
+
+#=
+    expscale = 2 ^ -scalefactor
+    yrangeextent = expscale
+    xrangeextent = expscale * aspectratio
+    numxrange = Int(floor(numyrange * aspectratio))
+    xrange = LinRange(centerx - xrangeextent / 2, centerx + xrangeextent / 2, numxrange)
+    yrange = LinRange(centery - yrangeextent / 2, centery + yrangeextent / 2, numyrange)
+    return xrange, yrange
+    =#
 
 
 
@@ -166,7 +231,7 @@ function cudastuffmandel()
     centerx = -0.5609882
     centery = 0.6409865
     scalefactor = 1.0
-    height = 1080
+    height = 360
     numiters = 200
     aspectratio = 16/9
     width = Int(floor(aspectratio * height))
