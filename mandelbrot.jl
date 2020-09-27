@@ -89,7 +89,7 @@ function rendermandelbrotimagecuda(centerx::Number, centery::Number, scalefactor
      numiters::Integer, height::Integer, aspectratio::Number)
     xrange, yrange = generatezoomranges(centerx, centery, scalefactor, height, aspectratio)
     complexrange = [Complex{Float64}(x, y) for x in xrange, y in yrange]
-    mandelimg = map(z->mandelbrot(z, numiters), complexrange)
+    mandelimg = map(z->mandelbrot(z, numiters) / numiters, complexrange)
     
     return xrange, yrange, mandelimg
 end
@@ -103,22 +103,26 @@ function examplesettings()
     scalefactorend = 4.0
     height = 360
     #numiters = 200
-    numiters = 300
+    numiters = 450
     #numiters = 40
     fps = 10
     seconds = 10.0
     aspectratio = 16/9
+    width = Int(floor(360 * aspectratio))
     #scene, layout = MakieLayout.layoutscene(1, 1, padding=100, show_axis=false)
     #ax = layout[1, 1] = MakieLayout.LAxis(scene, show_axis=false)
 
+    #scene = Makie.Scene(raw = true, resolution = (width, height))
     scene = Makie.Scene()
     xrange, yrange, mandelimg = rendermandelbrotimagecuda(centerx, centery, scalefactorstart, numiters, height, aspectratio) 
     #image = Makie.image!(scene, xrange, yrange, CUDA.CuArray(mandelimg), show_axis=false)
     #layout[1, 1] = Makie.image!(scene, xrange, yrange, mandelimg, show_axis=false, padding=0)
     #image = Makie.image!(ax, xrange, yrange, mandelimg, show_axis=false)
+    #u = Makie.Node(0.0)
+    #mandelimgnode = Makie.lift(x->mandelimg, u)
     image = Makie.image!(scene, xrange, yrange, mandelimg, show_axis=false)
     #image = rendermandelbrotimageanimation(image, centerx, centery, scalefactorstart, scalefactorend, numiters, fps, seconds, height, aspectratio)
-    return centerx, centery, scalefactorstart, scalefactorend, height, numiters, fps, seconds, aspectratio, scene
+    return centerx, centery, scalefactorstart, scalefactorend, height, numiters, fps, seconds, aspectratio, scene#, u, mandelimgnode, mandelimg
     # centerx, centery, scalefactorstart, scalefactorend, height, numiters, fps, seconds, aspectratio, image = examplesettings(); image
 end
 
@@ -136,43 +140,114 @@ function rendermandelbrotimageanimation(image, centerx::Number, centery::Number,
     return image
 end
 
-function rendermandelbrotimageanimation2(image, centerx::Number, centery::Number, scalefactorstart::Number,
+function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float64, scalefactorstart::Number,
      scalefactorend::Number, numiters::Integer, fps::Integer, seconds::Number, height::Integer, aspectratio::Number, savename::AbstractString)
     time = 0:1/fps:seconds
     numsteps = length(time)
     width = Int(floor(aspectratio * height))
 
     escape = CUDA.fill(0.0, width, height)
+    escape_cpu = zeros(Float64, width, height)
+    #@show typeof(escape_cpu)
+
+    local scalefactor = Float64(copy(scalefactorstart))
+    local centerxlocal = Float64(copy(centerx))
+    local centerylocal = Float64(copy(centery))
+
+    local endscene = false
+
+    Makie.lift(image.events.keyboardbuttons) do but
+        @show but
+        expscale = Float64(2.0 ^ -scalefactor)
+        local modified = false
+        movementscale = 0.01
+        zoomscale = 0.05
+        @show typeof(but)
+        #@show Makie.Keyboard.w in but
+        if Makie.Keyboard.w in but
+            centerylocal += movementscale * expscale
+            @show centerylocal
+            modified = true
+        end
+        if Makie.Keyboard.a in but
+            centerxlocal -= movementscale * expscale * aspectratio
+            @show centerxlocal
+            modified = true
+        end
+        if Makie.Keyboard.s in but
+            centerylocal -= movementscale * expscale
+            @show centerxlocal
+            modified = true
+        end
+        if Makie.Keyboard.d in but
+            centerxlocal += movementscale * expscale * aspectratio
+            @show centerxlocal
+            modified = true
+        end
+
+        #if Makie.ispressed(but, Makie.Keyboard.j) 
+        if Makie.Keyboard.j in but
+            scalefactor -= zoomscale
+            @show scalefactor
+            modified = true
+        end
+        if Makie.Keyboard.k in but
+            scalefactor += zoomscale
+            @show scalefactor
+            modified = true
+        end
+
+        if Makie.Keyboard.left_control in but
+            endscene = true
+        end
+        modified
+
+    end
+
 
     N = width * height
     #numblocks = ceil(Int, N/32)
     numthreads = (16, 16)
     numblocks = ceil(Int, width / numthreads[1]), ceil(Int, height / numthreads[2])
     #@show numblocks
-    while true
-        for (i, t) in enumerate([time; reverse(time)])
+    i = 0
+    while !endscene
+    #while false
+        #for (i, t) in enumerate([time; reverse(time)])
         #Makie.record(image, savename, enumerate(time); framerate=60) do (i, t)
-            CUDA.fill!(escape, 0.0)
-            scalefactor = (scalefactorend - scalefactorstart) * (t / seconds) + scalefactorstart 
+        CUDA.fill!(escape, 0.0)
+        #scalefactor = (scalefactorend - scalefactorstart) * (t / seconds) + scalefactorstart 
 
-            expscale = 2 ^ -scalefactor
-            yrangeextent = expscale
-            xrangeextent = expscale * aspectratio
-            xstart = centerx - xrangeextent / 2
-            ystart = centery - yrangeextent / 2
-            
-            CUDA.@sync begin
-                @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeextent, numiters, height, width, aspectratio)
-            end
-            image.plots[1][:image][] = Array(escape)
-            #Makie.update!(image)
-
-            #@show escape
-            sleep(0.0001)
+        expscale = Float64(2.0 ^ -scalefactor)
+        yrangeextent = expscale
+        xrangeextent = expscale * aspectratio
+        xstart = centerxlocal - xrangeextent / 2
+        ystart = centerylocal - yrangeextent / 2
+        
+        CUDA.@sync begin
+            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeextent, numiters, height, width, aspectratio)
         end
+        CUDA.copyto!(escape_cpu, escape)
+        #CUDA.copyto!(image.plots[1][:image][], escape)
+        #@show image.plots[1][:image][][200, 200]
+        image.plots[1][:image][] = escape_cpu
+        #@show typeof(image.plots[1].attributes)
+        #u[] = sin(Float64(i))
+        #image.plots[1][:image][] = escape_cpu
+        #image.plots[1][:image][] = image.plots[1][:image][]
+        #image.plots[1][:visible][] = true
+        #@show image.plots[1][:image][][200, 200]
+        #Makie.update!(image)
+        #Makie.update!(image)
+
+        #@show escape
+        i += 1
+        sleep(0.0001)
+        #end
     end
     @show length(time)
-    return escape
+    #return escape
+    return nothing
 end
 
 function mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeextent, numiters, height, width, aspectratio)
