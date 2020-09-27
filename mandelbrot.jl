@@ -94,13 +94,6 @@ function rendermandelbrotimagecuda(centerx::Number, centery::Number, scalefactor
 end
 
 
-function gpu_add1!(y, x)
-    for i in 1:length(y)
-        @inbounds y[i] += x[i]
-    end
-    return nothing
-end
-
 
 function examplesettings()
     centerx = -0.5609882
@@ -133,4 +126,65 @@ function rendermandelbrotimageanimation(image, centerx::Number, centery::Number,
     return image
 end
 
+
+
+function gpu_add3!(y, x)
+    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    stride = blockDim().x * gridDim().x
+    for i in index:stride:length(y)
+        @inbounds y[i] += x[i]
+    end
+    return nothing
+end
+
+function cudastuff()
+    N = 1024
+    x = CUDA.fill(1., N)
+    y = CUDA.fill(2., N)
+    numblocks = ceil(Int, N/256)
+    @cuda threads=256 blocks=numblocks gpu_add3!(y, x)
+    @show y
+end
+
+function bench_gpu3!(y, x)
+    numblocks = ceil(Int, length(y)/256)
+    CUDA.@sync begin
+        @cuda threads=256 blocks=numblocks gpu_add3!(y, x)
+    end
+end
+
+function gpu_mandel!(escape, z, numiters)
+    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    stride = blockDim().x * gridDim().x
+    for i in index:stride:length(z)
+        @inbounds escape[i] += mandelbrot(z[i], numiters)
+    end
+    return
+end
+
+function cudastuffmandel()
+    centerx = -0.5609882
+    centery = 0.6409865
+    scalefactor = 1.0
+    height = 1080
+    numiters = 200
+    aspectratio = 16/9
+    width = Int(floor(aspectratio * height))
+
+    xrange, yrange = generatezoomranges(centerx, centery, scalefactor, height, aspectratio)
+    z = CUDA.CuArray([Complex{Float64}(x, y) for x in xrange, y in yrange])
+    escape = CUDA.fill(0., width, height)
+
+    N = width * height
+    numblocks = ceil(Int, N/256)
+    #@cuda threads=256 blocks=numblocks gpu_mandel!(escape, z, numiters)
+    #@show escape
+    function bench_mandelgpu!(escapecur, zcur)
+        CUDA.@sync begin
+            @cuda threads=256 blocks=numblocks gpu_mandel!(escapecur, zcur, numiters)
+        end
+    end
+    return escape, z, bench_mandelgpu!
+
+end
 
