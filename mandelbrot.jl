@@ -3,6 +3,7 @@ using VideoIO
 using StaticArrays
 using CUDA
 import Makie
+import AbstractPlotting.MakieLayout
 
 function mandelbrot(z::Complex{T}, numiters::Integer) where {T <: Real}
     z_i = copy(z)
@@ -101,15 +102,23 @@ function examplesettings()
     scalefactorstart = 0.0
     scalefactorend = 4.0
     height = 360
-    numiters = 40
+    #numiters = 200
+    numiters = 300
+    #numiters = 40
     fps = 10
     seconds = 10.0
     aspectratio = 16/9
+    #scene, layout = MakieLayout.layoutscene(1, 1, padding=100, show_axis=false)
+    #ax = layout[1, 1] = MakieLayout.LAxis(scene, show_axis=false)
+
     scene = Makie.Scene()
     xrange, yrange, mandelimg = rendermandelbrotimagecuda(centerx, centery, scalefactorstart, numiters, height, aspectratio) 
+    #image = Makie.image!(scene, xrange, yrange, CUDA.CuArray(mandelimg), show_axis=false)
+    #layout[1, 1] = Makie.image!(scene, xrange, yrange, mandelimg, show_axis=false, padding=0)
+    #image = Makie.image!(ax, xrange, yrange, mandelimg, show_axis=false)
     image = Makie.image!(scene, xrange, yrange, mandelimg, show_axis=false)
     #image = rendermandelbrotimageanimation(image, centerx, centery, scalefactorstart, scalefactorend, numiters, fps, seconds, height, aspectratio)
-    return centerx, centery, scalefactorstart, scalefactorend, height, numiters, fps, seconds, aspectratio, image
+    return centerx, centery, scalefactorstart, scalefactorend, height, numiters, fps, seconds, aspectratio, scene
     # centerx, centery, scalefactorstart, scalefactorend, height, numiters, fps, seconds, aspectratio, image = examplesettings(); image
 end
 
@@ -140,25 +149,27 @@ function rendermandelbrotimageanimation2(image, centerx::Number, centery::Number
     numthreads = (16, 16)
     numblocks = ceil(Int, width / numthreads[1]), ceil(Int, height / numthreads[2])
     #@show numblocks
-    #for (i, t) in enumerate(time)
-    Makie.record(image, savename, enumerate(time); framerate=60) do (i, t)
-        #CUDA.fill!(escape, 0.0)
-        scalefactor = (scalefactorend - scalefactorstart) * (t / seconds) + scalefactorstart 
+    while true
+        for (i, t) in enumerate([time; reverse(time)])
+        #Makie.record(image, savename, enumerate(time); framerate=60) do (i, t)
+            CUDA.fill!(escape, 0.0)
+            scalefactor = (scalefactorend - scalefactorstart) * (t / seconds) + scalefactorstart 
 
-        expscale = 2 ^ -scalefactor
-        yrangeextent = expscale
-        xrangeextent = expscale * aspectratio
-        xstart = centerx - xrangeextent / 2
-        ystart = centery - yrangeextent / 2
-        
-        CUDA.@sync begin
-            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeextent, numiters, height, width, aspectratio)
+            expscale = 2 ^ -scalefactor
+            yrangeextent = expscale
+            xrangeextent = expscale * aspectratio
+            xstart = centerx - xrangeextent / 2
+            ystart = centery - yrangeextent / 2
+            
+            CUDA.@sync begin
+                @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeextent, numiters, height, width, aspectratio)
+            end
+            image.plots[1][:image][] = Array(escape)
+            #Makie.update!(image)
+
+            #@show escape
+            sleep(0.0001)
         end
-        image.plots[1][:image][] = Array(escape)
-        #Makie.update!(image)
-
-        #@show escape
-        sleep(0.0001)
     end
     @show length(time)
     return escape
@@ -178,19 +189,7 @@ function mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeext
         @inbounds escape[i, j] += mandelbrot(z_ij, numiters) / numiters
     end
     return
-
 end
-
-#=
-    expscale = 2 ^ -scalefactor
-    yrangeextent = expscale
-    xrangeextent = expscale * aspectratio
-    numxrange = Int(floor(numyrange * aspectratio))
-    xrange = LinRange(centerx - xrangeextent / 2, centerx + xrangeextent / 2, numxrange)
-    yrange = LinRange(centery - yrangeextent / 2, centery + yrangeextent / 2, numyrange)
-    return xrange, yrange
-    =#
-
 
 
 function gpu_add3!(y, x)
