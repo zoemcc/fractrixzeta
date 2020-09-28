@@ -2,6 +2,7 @@ using FileIO
 using VideoIO
 using StaticArrays
 using CUDA
+using Observables
 import Makie
 import AbstractPlotting.MakieLayout
 
@@ -153,6 +154,7 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     local scalefactor = Float64(copy(scalefactorstart))
     local centerxlocal = Float64(copy(centerx))
     local centerylocal = Float64(copy(centery))
+    local rotation = Float64(0.0)
 
     local endscene = false
 
@@ -162,25 +164,32 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         local modified = false
         movementscale = 0.01
         zoomscale = 0.05
+        rotscale = 0.05
+        cosrot = cos(rotation)
+        sinrot = sin(rotation)
         @show typeof(but)
         #@show Makie.Keyboard.w in but
         if Makie.Keyboard.w in but
-            centerylocal += movementscale * expscale
+            centerxlocal += -sinrot * movementscale * expscale
+            centerylocal += cosrot * movementscale * expscale
             @show centerylocal
             modified = true
         end
         if Makie.Keyboard.a in but
-            centerxlocal -= movementscale * expscale * aspectratio
+            centerxlocal -= cosrot * movementscale * expscale
+            centerylocal -= sinrot * movementscale * expscale
             @show centerxlocal
             modified = true
         end
         if Makie.Keyboard.s in but
-            centerylocal -= movementscale * expscale
+            centerxlocal -= -sinrot * movementscale * expscale
+            centerylocal -= cosrot * movementscale * expscale
             @show centerxlocal
             modified = true
         end
         if Makie.Keyboard.d in but
-            centerxlocal += movementscale * expscale * aspectratio
+            centerxlocal += cosrot * movementscale * expscale
+            centerylocal += sinrot * movementscale * expscale
             @show centerxlocal
             modified = true
         end
@@ -194,6 +203,17 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         if Makie.Keyboard.k in but
             scalefactor += zoomscale
             @show scalefactor
+            modified = true
+        end
+
+        if Makie.Keyboard.u in but
+            rotation -= rotscale
+            @show rotation
+            modified = true
+        end
+        if Makie.Keyboard.i in but
+            rotation += rotscale
+            @show rotation
             modified = true
         end
 
@@ -211,6 +231,7 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     numblocks = ceil(Int, width / numthreads[1]), ceil(Int, height / numthreads[2])
     #@show numblocks
     i = 0
+    listener = image.plots[1][:image].listeners[1]
     while !endscene
     #while false
         #for (i, t) in enumerate([time; reverse(time)])
@@ -221,16 +242,29 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         expscale = Float64(2.0 ^ -scalefactor)
         yrangeextent = expscale
         xrangeextent = expscale * aspectratio
-        xstart = centerxlocal - xrangeextent / 2
-        ystart = centerylocal - yrangeextent / 2
+        xstart = -xrangeextent / 2
+        ystart = -yrangeextent / 2
+
+        cosrot = cos(rotation)
+        sinrot = sin(rotation)
         
-        CUDA.@sync begin
-            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeextent, numiters, height, width, aspectratio)
+        @show "cuda"
+        @time CUDA.@sync begin
+            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, centerxlocal, xstart, xrangeextent, centerylocal, ystart, yrangeextent, numiters, height, width, cosrot, sinrot)
         end
-        CUDA.copyto!(escape_cpu, escape)
+        @show "copy"
+        @time CUDA.copyto!(escape_cpu, escape)
         #CUDA.copyto!(image.plots[1][:image][], escape)
         #@show image.plots[1][:image][][200, 200]
-        image.plots[1][:image][] = escape_cpu
+        @show "imageplotcopy"
+        @time image.plots[1][:image][] .= escape_cpu
+        #Observables.notify!(image.plots[1][:image])
+        @show "invoke"
+        @time Base.invokelatest(listener, escape_cpu)
+
+        #TODO: what is a listener? where is it generated?
+
+
         #@show typeof(image.plots[1].attributes)
         #u[] = sin(Float64(i))
         #image.plots[1][:image][] = escape_cpu
@@ -250,7 +284,7 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     return nothing
 end
 
-function mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeextent, numiters, height, width, aspectratio)
+function mandelbrotandregiongpu!(escape, centerx, xstart, xrangeextent, centery, ystart, yrangeextent, numiters, height, width, cosrot, sinrot)
     indexx = (blockIdx().x - 1) * blockDim().x + threadIdx().x
     indexy = (blockIdx().y - 1) * blockDim().y + threadIdx().y
     stridex = blockDim().x * gridDim().x
@@ -258,9 +292,10 @@ function mandelbrotandregiongpu!(escape, xstart, xrangeextent, ystart, yrangeext
     #@cuprintln("thread $indexx, $indexy, block $stridex, $stridey")
     #@cuprintln("thread $indexx, $indexy")
     for i in indexx:stridex:width, j in indexy:stridey:height
-        x_ij = (i - 1) / (width - 1) * xrangeextent + xstart
-        y_ij = (j - 1) / (height - 1) * yrangeextent + ystart
-        z_ij = ComplexF64(x_ij, y_ij)
+        prex_ij = (i - 1) / (width - 1) * xrangeextent + xstart
+        prey_ij = (j - 1) / (height - 1) * yrangeextent + ystart
+        z_ij = ComplexF64(cosrot * prex_ij - sinrot * prey_ij + centerx, sinrot * prex_ij + cosrot * prey_ij + centery)
+        #z_ij = ComplexF64(x_ij, y_ij)
         @inbounds escape[i, j] += mandelbrot(z_ij, numiters) / numiters
     end
     return
