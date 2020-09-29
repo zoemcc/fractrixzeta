@@ -1,4 +1,5 @@
 using FileIO
+using Dates
 using ColorTypes
 using VideoIO
 using StaticArrays
@@ -143,13 +144,16 @@ function rendermandelbrotimageanimation(image, centerx::Number, centery::Number,
     return image
 end
 
+# includet("mandelbrot.jl"); centerx, centery, scalefactorstart, scalefactorend, height, numiters, fps, seconds, aspectratio, image = examplesettings(); image
+# includet("mandelbrot.jl"); @time rendermandelbrotimageanimation2(image, centerx, centery, scalefactorstart, scalefactorend, numiters, fps, seconds, height, aspectratio, "")
 function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float64, scalefactorstart::Number,
      scalefactorend::Number, numiters::Integer, fps::Integer, seconds::Number, height::Integer, aspectratio::Number, savename::AbstractString)
-    time = 0:1/fps:seconds
-    numsteps = length(time)
+    #time = 0:1/fps:seconds
+    #numsteps = length(time)
     width = Int(floor(aspectratio * height))
 
     escape = CUDA.fill(0.0, width, height)
+    escape_color = CUDA.fill(ColorTypes.RGBA{Float32}(0.0, 0.0, 0.0), width, height)
     escape_cpu = zeros(Float64, width, height)
     escape_cpu_color = [ColorTypes.RGBA(Float32(0.5), Float32(0.5), Float32(0.5)) for x in 1:width, y in 1:height]
     grayscalecolors = [ColorTypes.RGBA(i/255, i/255, i/255) for i in 0:255]
@@ -244,6 +248,12 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     i = 0
     listener = image.plots[1][:image].listeners[1]
     makimg = image.plots[1][:image]
+    a = ComplexF64(1., 1.)
+    b = ComplexF64(3., 0.)
+    c = ComplexF64(0., 1.)
+    d = ComplexF64(1., 0.)
+
+    starttime = time()
     while !endscene
     #Makie.record(image, savename, enumerate(time); framerate=60) do (i, t)
         CUDA.fill!(escape, 0.0)
@@ -259,34 +269,38 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         
         @show "cuda"
         @time CUDA.@sync begin
-            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, centerxlocal, xstart, xrangeextent, centerylocal, ystart, yrangeextent, numiters, height, width, cosrot, sinrot)
+            #@cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, centerxlocal, xstart, xrangeextent, centerylocal, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
+            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, escape_color, centerxlocal, xstart, xrangeextent, centerylocal, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
         end
 
         @show "copy"
-        @time CUDA.copyto!(escape_cpu, escape)
+        #@time CUDA.copyto!(escape_cpu, escape)
+        @time CUDA.copyto!(escape_cpu_color, escape_color)
 
-        @show "copytocolor"
-        for (l, z) in enumerate(escape_cpu)
-            escape_cpu_color[l] = ColorTypes.RGBA{Float32}(Float32(z), Float32(z), Float32(z))
-        end
+        #@show "copytocolor"
+        #for (l, z) in enumerate(escape_cpu)
+            #escape_cpu_color[l] = ColorTypes.RGBA{Float32}(Float32(z), Float32(z), Float32(z))
+        #end
 
         @show "imageplotcopy"
         @time makimg[] = escape_cpu_color
 
         i += 1
         sleep(0.0001)
+        nowtime = time()
+        curtimeperframe = (nowtime - starttime) / i
+        @show curtimeperframe
+        curfps = 1 / curtimeperframe
+        @show curfps
         #end
     end
-    @show length(time)
+    #@show length(time)
     #return escape
     return nothing
 end
 
-function mandelbrotandregiongpu!(escape, centerx, xstart, xrangeextent, centery, ystart, yrangeextent, numiters, height, width, cosrot, sinrot)
-    a = ComplexF64(1., 1.)
-    b = ComplexF64(3., 0.)
-    c = ComplexF64(2., 1.)
-    d = ComplexF64(1., 0.)
+#function mandelbrotandregiongpu!(escape, centerx, xstart, xrangeextent, centery, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
+function mandelbrotandregiongpu!(escape, escape_color, centerx, xstart, xrangeextent, centery, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
     indexx = (blockIdx().x - 1) * blockDim().x + threadIdx().x
     indexy = (blockIdx().y - 1) * blockDim().y + threadIdx().y
     stridex = blockDim().x * gridDim().x
@@ -299,7 +313,10 @@ function mandelbrotandregiongpu!(escape, centerx, xstart, xrangeextent, centery,
         z_ij = ComplexF64(cosrot * prex_ij - sinrot * prey_ij + centerx, sinrot * prex_ij + cosrot * prey_ij + centery)
         z_ij_mobius = mobiustransform(z_ij, a, b, c, d)
         #z_ij = ComplexF64(x_ij, y_ij)
-        @inbounds escape[i, j] += mandelbrot(z_ij_mobius, numiters) / numiters
+        escape_ij = mandelbrot(z_ij_mobius, numiters) / numiters
+        escape_ij_f32 = Float32(escape_ij)
+        #@inbounds escape[i, j] += escape_ij
+        @inbounds escape_color[i, j] = ColorTypes.RGBA{Float32}(escape_ij_f32, escape_ij_f32, escape_ij_f32)
     end
     return
 end
