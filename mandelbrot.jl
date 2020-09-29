@@ -166,22 +166,23 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     end
     #@show typeof(escape_cpu)
 
-    local scalefactor = Float64(copy(scalefactorstart))
-    local centerxlocal = Float64(copy(centerx))
-    local centerylocal = Float64(copy(centery))
-    local rotation = Float64(0.0)
+    numtype = Float64
+    local scalefactor = numtype(copy(scalefactorstart))
+    local centerxlocal = numtype(copy(centerx))
+    local centerylocal = numtype(copy(centery))
+    local rotation = numtype(0.0)
 
     local endscene = false
 
     Makie.lift(image.events.keyboardbuttons) do but
         @show but
-        expscale = Float64(2.0 ^ -scalefactor)
+        expscale = numtype(2.0 ^ -scalefactor)
         local modified = false
-        movementscale = 0.01
-        zoomscale = 0.05
-        rotscale = 0.05
-        cosrot = cos(rotation)
-        sinrot = sin(rotation)
+        movementscale = numtype(0.01)
+        zoomscale = numtype(0.05)
+        rotscale = numtype(0.05)
+        cosrot = numtype(cos(rotation))
+        sinrot = numtype(sin(rotation))
         @show typeof(but)
         #@show Makie.Keyboard.w in but
         if Makie.Keyboard.w in but
@@ -210,6 +211,7 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         end
 
         #if Makie.ispressed(but, Makie.Keyboard.j) 
+        # note: scale factor for Float32 is approximately capped at 32
         if Makie.Keyboard.j in but
             scalefactor -= zoomscale
             @show scalefactor
@@ -248,29 +250,29 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     i = 0
     listener = image.plots[1][:image].listeners[1]
     makimg = image.plots[1][:image]
-    a = ComplexF64(1., 1.)
-    b = ComplexF64(3., 0.)
-    c = ComplexF64(0., 1.)
-    d = ComplexF64(1., 0.)
+    a = Complex{numtype}(1., 1.)
+    b = Complex{numtype}(3., 0.)
+    c = Complex{numtype}(0., 1.)
+    d = Complex{numtype}(1., 0.)
 
     starttime = time()
     while !endscene
     #Makie.record(image, savename, enumerate(time); framerate=60) do (i, t)
         CUDA.fill!(escape, 0.0)
 
-        expscale = Float64(2.0 ^ -scalefactor)
-        yrangeextent = expscale
-        xrangeextent = expscale * aspectratio
-        xstart = -xrangeextent / 2
-        ystart = -yrangeextent / 2
+        expscale = numtype(2.0 ^ -scalefactor)
+        yrangeextent = numtype(expscale)
+        xrangeextent = numtype(expscale * aspectratio)
+        xstart = numtype(-xrangeextent / 2)
+        ystart = numtype(-yrangeextent / 2)
 
-        cosrot = cos(rotation)
-        sinrot = sin(rotation)
+        cosrot = numtype(cos(rotation))
+        sinrot = numtype(sin(rotation))
         
         @show "cuda"
         @time CUDA.@sync begin
             #@cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, centerxlocal, xstart, xrangeextent, centerylocal, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
-            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, escape_color, centerxlocal, xstart, xrangeextent, centerylocal, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
+            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape_color, centerxlocal, xstart, xrangeextent, centerylocal, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
         end
 
         @show "copy"
@@ -300,7 +302,8 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
 end
 
 #function mandelbrotandregiongpu!(escape, centerx, xstart, xrangeextent, centery, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
-function mandelbrotandregiongpu!(escape, escape_color, centerx, xstart, xrangeextent, centery, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
+function mandelbrotandregiongpu!(escape_color, centerx::N, xstart::N, xrangeextent::N, centery::N, ystart::N, yrangeextent::N, 
+    numiters, height, width, cosrot::N, sinrot::N, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N}) where {N <: Real}
     indexx = (blockIdx().x - 1) * blockDim().x + threadIdx().x
     indexy = (blockIdx().y - 1) * blockDim().y + threadIdx().y
     stridex = blockDim().x * gridDim().x
@@ -310,7 +313,7 @@ function mandelbrotandregiongpu!(escape, escape_color, centerx, xstart, xrangeex
     for i in indexx:stridex:width, j in indexy:stridey:height
         prex_ij = (i - 1) / (width - 1) * xrangeextent + xstart
         prey_ij = (j - 1) / (height - 1) * yrangeextent + ystart
-        z_ij = ComplexF64(cosrot * prex_ij - sinrot * prey_ij + centerx, sinrot * prex_ij + cosrot * prey_ij + centery)
+        z_ij = Complex{N}(cosrot * prex_ij - sinrot * prey_ij + centerx, sinrot * prex_ij + cosrot * prey_ij + centery)
         z_ij_mobius = mobiustransform(z_ij, a, b, c, d)
         #z_ij = ComplexF64(x_ij, y_ij)
         escape_ij = mandelbrot(z_ij_mobius, numiters) / numiters
@@ -321,7 +324,7 @@ function mandelbrotandregiongpu!(escape, escape_color, centerx, xstart, xrangeex
     return
 end
 
-function mobiustransform(z::Complex{T}, a::Complex{T}, b::Complex{T}, c::Complex{T}, d::Complex{T})::Complex{T} where {T <: Real}
+function mobiustransform(z::Complex{N}, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N})::Complex{N} where {N <: Real}
     return (z * a + b) / (z * c + d)
 end
 
