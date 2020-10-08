@@ -8,6 +8,8 @@ using Observables
 import Makie
 import AbstractPlotting.MakieLayout
 
+tau = 2 * pi
+
 function mandelbrot(z::Complex{T}, numiters::Integer) where {T <: Real}
     z_i = copy(z)
     if abs(z) > 2
@@ -102,9 +104,11 @@ end
 function examplesettings()
     centerx = -0.5609882
     centery = 0.6409865
+    centerx = 0.0
+    centery = 0.0
     scalefactorstart = 0.0
     scalefactorend = 4.0
-    height = 720
+    height = 480
     #numiters = 200
     numiters = 250
     #numiters = 40
@@ -265,8 +269,17 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     c = Complex{numtype}(0., 1.)
     d = Complex{numtype}(1., 0.)
 
+    lambdaangle = numtype(0.5)
+    adisk = Complex{numtype}(numtype(0.2), numtype(0.3))
+    lambdaangle, adisk = randomdiskmobius()
+
+    lambdaangletarget, adisktarget = randomdiskmobius()
+
+    #a, b, c, d = diskmobius(lambdaangle, adisk)
+
     starttime = time()
     local prevtime = starttime
+    local mobiuswalktime = prevtime
     while !endscene
     #for k in 1:1
     #Makie.record(image, savename, enumerate(time); framerate=60) do (i, t)
@@ -346,7 +359,14 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
             @show rotation
         end
 
+        if curtime - mobiuswalktime > 3
+            lambdaangletarget, adisktarget = randomdiskmobius()
+            mobiuswalktime = curtime
+        end
 
+        lambdaangle += (lambdaangletarget - lambdaangle) * deltatime
+        adisk += (adisktarget - adisk) * deltatime
+        a, b, c, d = diskmobius(lambdaangle, adisk)
         
         @show "cuda"
         @time CUDA.@sync begin
@@ -400,6 +420,26 @@ end
 
 function mobiustransform(z::Complex{N}, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N})::Complex{N} where {N <: Real}
     return (z * a + b) / (z * c + d)
+end
+
+function diskmobius(lambdaangle::N, a::Complex{N}) where {N <: Real}
+    # maps the unit disk to itself
+    # example 4 in section 3.4 in Complex Variables 2nd Ed by Stephen Fisher book
+    # f(z) = lambda * (a - z) / (1 - āz)
+    lambda = Complex{N}(cos(lambdaangle), sin(lambdaangle))
+    moba = -lambda
+    mobb = lambda * a
+    mobc = -conj(a)
+    mobd = Complex{N}(1, 0)
+    return moba, mobb, mobc, mobd
+end
+
+function randomdiskmobius()
+    lambdaangle = rand(Float64) * tau
+    aangle = rand(Float64) * tau
+    aradius = rand(Float64)
+    a = Complex{Float64}(aradius * cos(aangle), aradius * sin(aangle))
+    return lambdaangle, a
 end
 
 
