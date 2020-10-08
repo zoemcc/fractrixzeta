@@ -163,10 +163,6 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     grayscalecolors = [ColorTypes.RGBA(i/255, i/255, i/255) for i in 0:255]
     for (l, z) in enumerate(escape_cpu)
         escape_cpu_color[l] = grayscalecolors[100]
-        #escape_cpu_color[l].r = z
-        #escape_cpu_color[l].g = z
-        #escape_cpu_color[l].b = z
-        #escape_cpu_color[l].a = 1.0
     end
     #@show typeof(escape_cpu)
 
@@ -193,66 +189,21 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
 
     Makie.lift(image.events.keyboardbuttons) do but
         @show but
-        local modified = false
 
-        if Makie.Keyboard.w in but
-            modified = true
-            wdown = true
-        elseif wdown == true
-            wdown = false
-        end
-        if Makie.Keyboard.a in but
-            modified = true
-            adown = true
-        elseif adown == true
-            adown = false
-        end
-        if Makie.Keyboard.s in but
-            modified = true
-            sdown = true
-        elseif sdown == true
-            sdown = false
-        end
-        if Makie.Keyboard.d in but
-            modified = true
-            ddown = true
-        elseif ddown == true
-            ddown = false
-        end
+        wdown = Makie.Keyboard.w in but
+        adown = Makie.Keyboard.a in but
+        sdown = Makie.Keyboard.s in but
+        ddown = Makie.Keyboard.d in but
 
-        #if Makie.ispressed(but, Makie.Keyboard.j) 
-        # note: scale factor for Float32 is approximately capped at 32
-        if Makie.Keyboard.j in but
-            modified = true
-            jdown = true
-        elseif jdown == true
-            jdown = false
-        end
-        if Makie.Keyboard.k in but
-            modified = true
-            kdown = true
-        elseif kdown == true
-            kdown = false
-        end
+        jdown = Makie.Keyboard.j in but
+        kdown = Makie.Keyboard.k in but
 
-        if Makie.Keyboard.u in but
-            modified = true
-            udown = true
-        elseif udown == true
-            udown = false
-        end
-        if Makie.Keyboard.i in but
-            modified = true
-            idown = true
-        elseif idown == true
-            idown = false
-        end
+        udown = Makie.Keyboard.u in but
+        idown = Makie.Keyboard.i in but
 
-        if Makie.Keyboard.left_control in but
-            endscene = true
-        end
-        modified
+        endscene = Makie.Keyboard.left_control in but
 
+        nothing
     end
 
 
@@ -327,6 +278,7 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
             @show centerylocal
         end
 
+        # note: scale factor for Float32 is approximately capped at 32
         if jdown
             scalefactor -= zoomscale * deltatime
             expscale = numtype(2.0 ^ -scalefactor)
@@ -409,10 +361,8 @@ function mandelbrotandregiongpu!(escape_color, centerx::N, xstart::N, xrangeexte
         prey_ij = (j - 1) / (height - 1) * yrangeextent + ystart
         z_ij = Complex{N}(cosrot * prex_ij - sinrot * prey_ij + centerx, sinrot * prex_ij + cosrot * prey_ij + centery)
         z_ij_mobius = mobiustransform(z_ij, a, b, c, d)
-        #z_ij = ComplexF64(x_ij, y_ij)
         escape_ij = mandelbrot(z_ij_mobius, numiters) / numiters
         escape_ij_f32 = Float32(escape_ij)
-        #@inbounds escape[i, j] += escape_ij
         @inbounds escape_color[i, j] = ColorTypes.RGBA{Float32}(escape_ij_f32, escape_ij_f32, escape_ij_f32)
     end
     return
