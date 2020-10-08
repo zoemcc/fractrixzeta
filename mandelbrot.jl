@@ -188,7 +188,7 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     rotscale = numtype(1.0)
 
     Makie.lift(image.events.keyboardbuttons) do but
-        @show but
+        #@show but
 
         wdown = Makie.Keyboard.w in but
         adown = Makie.Keyboard.a in but
@@ -215,10 +215,16 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     i = 0
     listener = image.plots[1][:image].listeners[1]
     makimg = image.plots[1][:image]
-    a = Complex{numtype}(1., 1.)
-    b = Complex{numtype}(3., 0.)
-    c = Complex{numtype}(0., 1.)
+    a = Complex{numtype}(1., 0.)
+    b = Complex{numtype}(0., 0.)
+    c = Complex{numtype}(0., 0.)
     d = Complex{numtype}(1., 0.)
+
+    mobiusparams = [a, b, c, d]
+
+    z1 = Complex{numtype}(-1., 0.)
+    z2 = Complex{numtype}(1., -1.)
+    lr = 0.001
 
     lambdaangle = numtype(0.5)
     adisk = Complex{numtype}(numtype(0.2), numtype(0.3))
@@ -240,9 +246,11 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         curtime = time()
         deltatime = curtime - prevtime
         curtimeperframe = (curtime - starttime) / i
-        @show curtimeperframe
+        #@show curtimeperframe
         curfps = 1 / curtimeperframe
-        @show curfps
+        if i % 20 == 0
+            @show curfps
+        end
 
         expscale = numtype(2.0 ^ -scalefactor)
         yrangeextent = numtype(expscale)
@@ -256,26 +264,26 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         if wdown
             centerxlocal += -sinrot * movementscale * expscale * deltatime
             centerylocal += cosrot * movementscale * expscale * deltatime
-            @show centerxlocal
-            @show centerylocal
+            #@show centerxlocal
+            #@show centerylocal
         end
         if adown
             centerxlocal -= cosrot * movementscale * expscale * deltatime
             centerylocal -= sinrot * movementscale * expscale * deltatime
-            @show centerxlocal
-            @show centerylocal
+            #@show centerxlocal
+            #@show centerylocal
         end
         if sdown
             centerxlocal -= -sinrot * movementscale * expscale * deltatime
             centerylocal -= cosrot * movementscale * expscale * deltatime
-            @show centerxlocal
-            @show centerylocal
+            #@show centerxlocal
+            #@show centerylocal
         end
         if ddown
             centerxlocal += cosrot * movementscale * expscale * deltatime
             centerylocal += sinrot * movementscale * expscale * deltatime
-            @show centerxlocal
-            @show centerylocal
+            #@show centerxlocal
+            #@show centerylocal
         end
 
         # note: scale factor for Float32 is approximately capped at 32
@@ -286,7 +294,7 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
             xrangeextent = numtype(expscale * aspectratio)
             xstart = numtype(-xrangeextent / 2)
             ystart = numtype(-yrangeextent / 2)
-            @show scalefactor
+            #@show scalefactor
         end
         if kdown
             scalefactor += zoomscale * deltatime
@@ -295,20 +303,20 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
             xrangeextent = numtype(expscale * aspectratio)
             xstart = numtype(-xrangeextent / 2)
             ystart = numtype(-yrangeextent / 2)
-            @show scalefactor
+            #@show scalefactor
         end
 
         if udown
             rotation -= rotscale * deltatime
             cosrot = numtype(cos(rotation))
             sinrot = numtype(sin(rotation))
-            @show rotation
+            #@show rotation
         end
         if idown
             rotation += rotscale * deltatime
             cosrot = numtype(cos(rotation))
             sinrot = numtype(sin(rotation))
-            @show rotation
+            #@show rotation
         end
 
         if curtime - mobiuswalktime > 3
@@ -318,25 +326,35 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
 
         lambdaangle += (lambdaangletarget - lambdaangle) * deltatime
         adisk += (adisktarget - adisk) * deltatime
-        a, b, c, d = diskmobius(lambdaangle, adisk)
+        #a, b, c, d = diskmobius(lambdaangle, adisk)
+
+        distfunc = mobiusparams -> complexdist(mobiustransform(z1, mobiusparams...), z2)
+        gradmobius = gradient(distfunc, mobiusparams)[1]
+        if i % 5 == 0
+            @show distfunc(mobiusparams)
+            @show mobiusparams
+            @show gradmobius
+            mobiusparams .-= gradmobius .* lr
+        end
         
-        @show "cuda"
-        @time CUDA.@sync begin
+        #@show "cuda"
+        #@time CUDA.@sync begin
+        CUDA.@sync begin
             #@cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape, centerxlocal, xstart, xrangeextent, centerylocal, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
-            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape_color, centerxlocal, xstart, xrangeextent, centerylocal, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
+            @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(escape_color, centerxlocal, xstart, xrangeextent, centerylocal, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, mobiusparams...)
         end
 
-        @show "copy"
+        #@show "copy"
         #@time CUDA.copyto!(escape_cpu, escape)
-        @time CUDA.copyto!(escape_cpu_color, escape_color)
+        CUDA.copyto!(escape_cpu_color, escape_color)
 
         #@show "copytocolor"
         #for (l, z) in enumerate(escape_cpu)
             #escape_cpu_color[l] = ColorTypes.RGBA{Float32}(Float32(z), Float32(z), Float32(z))
         #end
 
-        @show "imageplotcopy"
-        @time makimg[] = escape_cpu_color
+        #@show "imageplotcopy"
+        makimg[] = escape_cpu_color
 
         i += 1
         sleep(0.0001)
@@ -370,6 +388,11 @@ end
 
 function mobiustransform(z::Complex{N}, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N})::Complex{N} where {N <: Real}
     return (z * a + b) / (z * c + d)
+end
+
+
+function complexdist(z1::Complex{N}, z2::Complex{N})::N where {N <: Real}
+    return abs(z1 - z2)
 end
 
 function diskmobius(lambdaangle::N, a::Complex{N}) where {N <: Real}
