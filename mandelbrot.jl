@@ -330,11 +330,11 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
 
         distfunc = mobiusparams -> complexdist(mobiustransform(z1, mobiusparams...), z2)
         gradmobius = gradient(distfunc, mobiusparams)[1]
+        mobiusparams .-= gradmobius .* lr .* distfunc(mobiusparams)
         if i % 5 == 0
             @show distfunc(mobiusparams)
             @show mobiusparams
             @show gradmobius
-            mobiusparams .-= gradmobius .* lr
         end
         
         #@show "cuda"
