@@ -104,9 +104,9 @@ function examplesettings()
     centery = 0.6409865
     scalefactorstart = 0.0
     scalefactorend = 4.0
-    height = 360
+    height = 720
     #numiters = 200
-    numiters = 450
+    numiters = 250
     #numiters = 40
     fps = 10
     seconds = 10.0
@@ -172,66 +172,76 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     local centerylocal = numtype(copy(centery))
     local rotation = numtype(0.0)
 
+    local wdown = false
+    local adown = false
+    local sdown = false
+    local ddown = false
+    local jdown = false
+    local kdown = false
+    local udown = false
+    local idown = false
+
     local endscene = false
+
+    movementscale = numtype(0.2)
+    zoomscale = numtype(1.0)
+    rotscale = numtype(1.0)
 
     Makie.lift(image.events.keyboardbuttons) do but
         @show but
-        expscale = numtype(2.0 ^ -scalefactor)
         local modified = false
-        movementscale = numtype(0.01)
-        zoomscale = numtype(0.05)
-        rotscale = numtype(0.05)
-        cosrot = numtype(cos(rotation))
-        sinrot = numtype(sin(rotation))
-        @show typeof(but)
-        #@show Makie.Keyboard.w in but
+
         if Makie.Keyboard.w in but
-            centerxlocal += -sinrot * movementscale * expscale
-            centerylocal += cosrot * movementscale * expscale
-            @show centerylocal
             modified = true
+            wdown = true
+        elseif wdown == true
+            wdown = false
         end
         if Makie.Keyboard.a in but
-            centerxlocal -= cosrot * movementscale * expscale
-            centerylocal -= sinrot * movementscale * expscale
-            @show centerxlocal
             modified = true
+            adown = true
+        elseif adown == true
+            adown = false
         end
         if Makie.Keyboard.s in but
-            centerxlocal -= -sinrot * movementscale * expscale
-            centerylocal -= cosrot * movementscale * expscale
-            @show centerxlocal
             modified = true
+            sdown = true
+        elseif sdown == true
+            sdown = false
         end
         if Makie.Keyboard.d in but
-            centerxlocal += cosrot * movementscale * expscale
-            centerylocal += sinrot * movementscale * expscale
-            @show centerxlocal
             modified = true
+            ddown = true
+        elseif ddown == true
+            ddown = false
         end
 
         #if Makie.ispressed(but, Makie.Keyboard.j) 
         # note: scale factor for Float32 is approximately capped at 32
         if Makie.Keyboard.j in but
-            scalefactor -= zoomscale
-            @show scalefactor
             modified = true
+            jdown = true
+        elseif jdown == true
+            jdown = false
         end
         if Makie.Keyboard.k in but
-            scalefactor += zoomscale
-            @show scalefactor
             modified = true
+            kdown = true
+        elseif kdown == true
+            kdown = false
         end
 
         if Makie.Keyboard.u in but
-            rotation -= rotscale
-            @show rotation
             modified = true
+            udown = true
+        elseif udown == true
+            udown = false
         end
         if Makie.Keyboard.i in but
-            rotation += rotscale
-            @show rotation
             modified = true
+            idown = true
+        elseif idown == true
+            idown = false
         end
 
         if Makie.Keyboard.left_control in but
@@ -256,9 +266,19 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     d = Complex{numtype}(1., 0.)
 
     starttime = time()
+    local prevtime = starttime
     while !endscene
+    #for k in 1:1
     #Makie.record(image, savename, enumerate(time); framerate=60) do (i, t)
         CUDA.fill!(escape, 0.0)
+
+
+        curtime = time()
+        deltatime = curtime - prevtime
+        curtimeperframe = (curtime - starttime) / i
+        @show curtimeperframe
+        curfps = 1 / curtimeperframe
+        @show curfps
 
         expscale = numtype(2.0 ^ -scalefactor)
         yrangeextent = numtype(expscale)
@@ -268,6 +288,65 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
 
         cosrot = numtype(cos(rotation))
         sinrot = numtype(sin(rotation))
+
+        if wdown
+            centerxlocal += -sinrot * movementscale * expscale * deltatime
+            centerylocal += cosrot * movementscale * expscale * deltatime
+            @show centerxlocal
+            @show centerylocal
+        end
+        if adown
+            centerxlocal -= cosrot * movementscale * expscale * deltatime
+            centerylocal -= sinrot * movementscale * expscale * deltatime
+            @show centerxlocal
+            @show centerylocal
+        end
+        if sdown
+            centerxlocal -= -sinrot * movementscale * expscale * deltatime
+            centerylocal -= cosrot * movementscale * expscale * deltatime
+            @show centerxlocal
+            @show centerylocal
+        end
+        if ddown
+            centerxlocal += cosrot * movementscale * expscale * deltatime
+            centerylocal += sinrot * movementscale * expscale * deltatime
+            @show centerxlocal
+            @show centerylocal
+        end
+
+        if jdown
+            scalefactor -= zoomscale * deltatime
+            expscale = numtype(2.0 ^ -scalefactor)
+            yrangeextent = numtype(expscale)
+            xrangeextent = numtype(expscale * aspectratio)
+            xstart = numtype(-xrangeextent / 2)
+            ystart = numtype(-yrangeextent / 2)
+            @show scalefactor
+        end
+        if kdown
+            scalefactor += zoomscale * deltatime
+            expscale = numtype(2.0 ^ -scalefactor)
+            yrangeextent = numtype(expscale)
+            xrangeextent = numtype(expscale * aspectratio)
+            xstart = numtype(-xrangeextent / 2)
+            ystart = numtype(-yrangeextent / 2)
+            @show scalefactor
+        end
+
+        if udown
+            rotation -= rotscale * deltatime
+            cosrot = numtype(cos(rotation))
+            sinrot = numtype(sin(rotation))
+            @show rotation
+        end
+        if idown
+            rotation += rotscale * deltatime
+            cosrot = numtype(cos(rotation))
+            sinrot = numtype(sin(rotation))
+            @show rotation
+        end
+
+
         
         @show "cuda"
         @time CUDA.@sync begin
@@ -289,11 +368,7 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
 
         i += 1
         sleep(0.0001)
-        nowtime = time()
-        curtimeperframe = (nowtime - starttime) / i
-        @show curtimeperframe
-        curfps = 1 / curtimeperframe
-        @show curfps
+        prevtime = curtime
         #end
     end
     #@show length(time)
@@ -308,8 +383,7 @@ function mandelbrotandregiongpu!(escape_color, centerx::N, xstart::N, xrangeexte
     indexy = (blockIdx().y - 1) * blockDim().y + threadIdx().y
     stridex = blockDim().x * gridDim().x
     stridey = blockDim().y * gridDim().y
-    #@cuprintln("thread $indexx, $indexy, block $stridex, $stridey")
-    #@cuprintln("thread $indexx, $indexy")
+    #@cuprintln("thread $indexx, $indexy, stride $stridex, $stridey, weight $width $height")
     for i in indexx:stridex:width, j in indexy:stridey:height
         prex_ij = (i - 1) / (width - 1) * xrangeextent + xstart
         prey_ij = (j - 1) / (height - 1) * yrangeextent + ystart
