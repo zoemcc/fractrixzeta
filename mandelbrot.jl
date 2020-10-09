@@ -222,9 +222,9 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
 
     mobiusparams = [a, b, c, d]
 
-    z1 = Complex{numtype}(-1., 0.)
+    z1 = Complex{numtype}(-1.4, 0.)
     z2 = Complex{numtype}(1., -1.)
-    lr = 0.001
+    lr = 0.02
 
     lambdaangle = numtype(0.5)
     adisk = Complex{numtype}(numtype(0.2), numtype(0.3))
@@ -329,12 +329,17 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         #a, b, c, d = diskmobius(lambdaangle, adisk)
 
         distfunc = mobiusparams -> complexdist(mobiustransform(z1, mobiusparams...), z2)
+        distparams = distfunc(mobiusparams)
         gradmobius = gradient(distfunc, mobiusparams)[1]
-        mobiusparams .-= gradmobius .* lr .* distfunc(mobiusparams)
+        mobiusparams .-= gradmobius .* lr .* distparams
+        if distparams < 1e-3
+            z2 = Complex{numtype}(randn(), randn())
+        end
         if i % 5 == 0
             @show distfunc(mobiusparams)
-            @show mobiusparams
-            @show gradmobius
+            @show z2
+            #@show mobiusparams
+            #@show gradmobius
         end
         
         #@show "cuda"
