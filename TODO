@@ -1,2 +1,8 @@
-handle keypresses being released correctly in input catch
-implement changing the mobius transform from user input
+implement a lot more loss functions
+implement initial travel map via graphs
+refactor all the code so that it's a lot more separated (rendering, computation, tests)
+gamestate data structure
+
+
+    
+
