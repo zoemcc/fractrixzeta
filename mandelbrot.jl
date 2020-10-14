@@ -237,6 +237,8 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     starttime = time()
     local prevtime = starttime
     local mobiuswalktime = prevtime
+
+    l = 0
     while !endscene
     #for k in 1:1
     #Makie.record(image, savename, enumerate(time); framerate=60) do (i, t)
@@ -332,9 +334,11 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         distparams = distfunc(mobiusparams)
         gradmobius = gradient(distfunc, mobiusparams)[1]
         mobiusparams .-= gradmobius .* lr .* distparams
-        if distparams < 1e-3
+        if distparams < 1e-3 || l > 100
             z2 = Complex{numtype}(randn(), randn())
+            l = 0
         end
+        l += 1
         if i % 5 == 0
             @show distfunc(mobiusparams)
             @show z2
