@@ -1,4 +1,3 @@
-
 abstract type AbstractGameState end
 abstract type AbstractPlayerState end
 abstract type AbstractPlayerStateHistory end
@@ -22,7 +21,7 @@ struct PlayerStateNoResource{T <: Real, Point <: AbstractPoint{2, T}} <: Abstrac
 end
 
 struct PlayerStateHistoryBasic{Player <: AbstractPlayerState} <: AbstractPlayerStateHistory
-    history::Array{Player, 1}
+    history::Array{Player, 1} # possibly make this more general
 end
 
 struct WorldStateBasic{T <: Real, 
@@ -30,7 +29,7 @@ struct WorldStateBasic{T <: Real,
         Lantern <: AbstractLantern} <: AbstractWorldState
 
     current_transform::ConformalTransform
-    lantern_storage::Array{ConformalTransform, 1}
+    lantern_storage::Array{ConformalTransform, 1} # possibly make this more general
     lantern_graph::SimpleGraph # do I need to add a type parameter here?
     simtime::T
 end

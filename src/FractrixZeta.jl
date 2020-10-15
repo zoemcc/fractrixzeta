@@ -12,12 +12,14 @@ using CUDA
 using Zygote
 import Makie
 import AbstractPlotting.MakieLayout
+import AbstractPlotting
 
 tau = 2pi
 τ = tau
 TAU = τ
 
 include("state.jl")
+include("renderer.jl")
 include("mandelbrot.jl")
 
 end
@@ -28,11 +30,12 @@ end
 
 High level organization:
 
-AbstractGameState abstract struct 
-AbstractPlayerState abstract struct 
-AbstractWorldState abstract struct 
-AbstractConformalTransform abstract struct 
-AbstractLantern abstract struct
+AbstractGameState abstract type 
+AbstractPlayerState abstract type 
+AbstractWorldState abstract type 
+AbstractConformalTransform abstract type 
+AbstractLantern abstract type
+AbstractRenderer abstract type
 
 GameState struct <: AbstractGameState
     Designed to be a full reproduction of the state of the game.  
