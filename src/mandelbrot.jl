@@ -1,15 +1,3 @@
-using FileIO
-using Dates
-using ColorTypes
-using VideoIO
-using StaticArrays
-using CUDA
-using Observables
-import Makie
-import AbstractPlotting.MakieLayout
-
-tau = 2 * pi
-
 function mandelbrot(z::Complex{T}, numiters::Integer) where {T <: Real}
     z_i = copy(z)
     if abs(z) > 2
@@ -417,8 +405,8 @@ function diskmobius(lambdaangle::N, a::Complex{N}) where {N <: Real}
 end
 
 function randomdiskmobius()
-    lambdaangle = rand(Float64) * tau
-    aangle = rand(Float64) * tau
+    lambdaangle = rand(Float64) * τ
+    aangle = rand(Float64) * τ
     aradius = rand(Float64)
     a = Complex{Float64}(aradius * cos(aangle), aradius * sin(aangle))
     return lambdaangle, a
