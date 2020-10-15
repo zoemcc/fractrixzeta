@@ -5,7 +5,7 @@ struct MakieRenderer <: AbstractRenderer
     scene::AbstractPlotting.Scene
     image::Observables.Observable{Array{ColorTypes.RGBA{Float32}, 2}}
     cudaimage::CuArray{ColorTypes.RGBA{Float32}, 2}
-    numiters::Int64
+    numiters::Int64 # Should this be here? Where would be better?
     aspectratio::Float64
     height::Int64
     width::Int64
@@ -41,8 +41,8 @@ function render_game(renderer::MakieRenderer, gamestate::AbstractGameState)
     numblocks = ceil(Int, width / numthreads[1]), ceil(Int, height / numthreads[2])
 
     # GameState parameters
-    centerx, centery = position(player(gamestate)) .+ 0.3 .* randn.()
-    rotationfactor, scalefactor = rotation(player(gamestate)), scale(player(gamestate))
+    centerx, centery = position(player(gamestate)) .+ 0.4 .* randn.()
+    rotationfactor, scalefactor = rotation(player(gamestate)) + 0.5 * randn(), scale(player(gamestate)) + 0.5 * randn()
 
     expscale = numtype(2 ^ -scalefactor)
     yrangeextent = numtype(expscale)
@@ -63,7 +63,7 @@ function render_game(renderer::MakieRenderer, gamestate::AbstractGameState)
     end
 
     CUDA.copyto!(outimage[], cudaimage)
-    Observables.notify!(outimage)
+    @time Observables.notify!(outimage)
     sleep(0.0001)
     outimage[]
 end

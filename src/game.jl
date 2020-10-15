@@ -16,7 +16,7 @@ function init_game()
 end
 
 function run_game(game::Game)
-    @time for i in 1:10000
+    @time for i in 1:200
         render_game(game.renderer, game.gamestate)
     end
 end

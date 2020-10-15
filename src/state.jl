@@ -61,8 +61,8 @@ function init_world_state()
     T = Float64
     mobius = identity_mobius()
     testpoint = transform(mobius, Complex(1., 0))
-    lantern_storage = [NoLantern()]
-    lantern_graph = SimpleGraph(1)
+    lantern_storage = Array{AbstractLantern, 1}(undef, 0)
+    lantern_graph = SimpleGraph(0)
     simtime = T(0)
     WorldStateBasic(mobius, lantern_storage, lantern_graph, simtime)
 end
