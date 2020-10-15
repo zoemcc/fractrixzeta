@@ -1,0 +1,3 @@
+using FractrixZeta
+
+FractrixZeta.main()

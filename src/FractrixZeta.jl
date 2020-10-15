@@ -18,9 +18,18 @@ tau = 2pi
 τ = tau
 TAU = τ
 
+include("conformal_transforms.jl")
+include("lantern.jl")
 include("state.jl")
 include("renderer.jl")
+include("inputhandler.jl")
+include("config.jl")
 include("mandelbrot.jl")
+include("game.jl")
+
+function main()
+    initgame()
+end
 
 end
 

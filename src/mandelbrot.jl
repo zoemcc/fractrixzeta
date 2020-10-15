@@ -318,18 +318,21 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         adisk += (adisktarget - adisk) * deltatime
         #a, b, c, d = diskmobius(lambdaangle, adisk)
 
-        distfunc = mobiusparams -> complexdist(mobiustransform(z1, mobiusparams...), z2)
-        distparams = distfunc(mobiusparams)
-        gradmobius = gradient(distfunc, mobiusparams)[1]
-        mobiusparams .-= gradmobius .* lr .* distparams
+        #@show "optimization"
+        begin 
+            distfunc = mobiusparams -> complexdist(mobiustransform(z1, mobiusparams...), z2)
+            distparams = distfunc(mobiusparams)
+            gradmobius = gradient(distfunc, mobiusparams)[1]
+            mobiusparams .-= gradmobius .* lr .* distparams
+        end
         if distparams < 1e-3 || l > 100
             z2 = Complex{numtype}(randn(), randn())
             l = 0
         end
         l += 1
         if i % 5 == 0
-            @show distfunc(mobiusparams)
-            @show z2
+            #@show distfunc(mobiusparams)
+            #@show z2
             #@show mobiusparams
             #@show gradmobius
         end
@@ -343,7 +346,7 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
 
         #@show "copy"
         #@time CUDA.copyto!(escape_cpu, escape)
-        CUDA.copyto!(escape_cpu_color, escape_color)
+        CUDA.copyto!(makimg[], escape_color)
 
         #@show "copytocolor"
         #for (l, z) in enumerate(escape_cpu)
@@ -351,7 +354,9 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         #end
 
         #@show "imageplotcopy"
-        makimg[] = escape_cpu_color
+        #makimg[] = escape_cpu_color
+        Observables.notify!(makimg)
+        #@time makimg.listeners[1](makimg.val)
 
         i += 1
         sleep(0.0001)
