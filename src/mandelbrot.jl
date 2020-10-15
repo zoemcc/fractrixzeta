@@ -368,9 +368,8 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     return nothing
 end
 
-#function mandelbrotandregiongpu!(escape, centerx, xstart, xrangeextent, centery, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
 function mandelbrotandregiongpu!(escape_color, centerx::N, xstart::N, xrangeextent::N, centery::N, ystart::N, yrangeextent::N, 
-    numiters, height, width, cosrot::N, sinrot::N, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N}) where {N <: Real}
+        numiters, height, width, cosrot::N, sinrot::N, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N}) where {N <: Real}
     indexx = (blockIdx().x - 1) * blockDim().x + threadIdx().x
     indexy = (blockIdx().y - 1) * blockDim().y + threadIdx().y
     stridex = blockDim().x * gridDim().x
@@ -385,7 +384,7 @@ function mandelbrotandregiongpu!(escape_color, centerx::N, xstart::N, xrangeexte
         escape_ij_f32 = Float32(escape_ij)
         @inbounds escape_color[i, j] = ColorTypes.RGBA{Float32}(escape_ij_f32, escape_ij_f32, escape_ij_f32)
     end
-    return
+    return nothing
 end
 
 function mobiustransform(z::Complex{N}, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N})::Complex{N} where {N <: Real}

@@ -4,31 +4,67 @@ abstract type AbstractRenderer end
 struct MakieRenderer <: AbstractRenderer
     scene::AbstractPlotting.Scene
     image::Observables.Observable{Array{ColorTypes.RGBA{Float32}, 2}}
+    cudaimage::CuArray{ColorTypes.RGBA{Float32}, 2}
+    numiters::Int64
+    aspectratio::Float64
+    height::Int64
+    width::Int64
 end
 
 function init_renderer()
     scene = Makie.Scene()
-    height = 480
+    height = 720
     aspectratio = 16/9
-    width = Int(floor(360 * aspectratio))
-    xrange, yrange, mandelimg = rendermandelbrotimagecuda(0., 0., 0., 250, height, aspectratio) 
+    width = Int(floor(height * aspectratio))
+    numiters = 250
+    xrange, yrange, mandelimg = rendermandelbrotimagecuda(0., 0., 0., numiters, height, aspectratio) 
     mandelimgcolor = [ColorTypes.RGBA(Float32(color), Float32(color), Float32(color)) for color in mandelimg]
+    cudaimage = CUDA.CuArray(mandelimgcolor)
     Makie.image!(scene, mandelimgcolor, show_axis=false)
     display(scene)
     image = scene.plots[1][:image]
-    MakieRenderer(scene, image)
+    MakieRenderer(scene, image, cudaimage, numiters, aspectratio, height, width)
 end
 
-#function update_image(renderer::MakieRenderer)
-    #renderer.image[] = image
-    #image
-#end
+function render_game(renderer::MakieRenderer, gamestate::AbstractGameState)
+    numtype = Float64
+    # First gather the parameters
+    # Renderer parameters
+    numiters = renderer.numiters
+    outimage = renderer.image
+    cudaimage = renderer.cudaimage
+    aspectratio = renderer.aspectratio
+    height = renderer.height
+    width = renderer.width
 
+    numthreads = (16, 16)
+    numblocks = ceil(Int, width / numthreads[1]), ceil(Int, height / numthreads[2])
 
-function render_game(renderer::AbstractRenderer, gamestate::AbstractGameState)
-    # first gather the parameters
+    # GameState parameters
+    centerx, centery = position(player(gamestate)) .+ 0.3 .* randn.()
+    rotationfactor, scalefactor = rotation(player(gamestate)), scale(player(gamestate))
+
+    expscale = numtype(2 ^ -scalefactor)
+    yrangeextent = numtype(expscale)
+    xrangeextent = numtype(expscale * aspectratio)
+    xstart = numtype(-xrangeextent / 2)
+    ystart = numtype(-yrangeextent / 2)
+    cosrot = numtype(cos(rotationfactor))
+    sinrot = numtype(sin(rotationfactor))
+
+    mobius = current_transform(world(gamestate))
+    a, b, c, d = mobius.a, mobius.b, mobius.c, mobius.d
 
     # then call 
+    CUDA.@sync begin
+        @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(cudaimage,
+            centerx, xstart, xrangeextent, centery, ystart, yrangeextent,
+            numiters, height, width, cosrot, sinrot, a, b, c, d)
+    end
 
+    CUDA.copyto!(outimage[], cudaimage)
+    Observables.notify!(outimage)
+    sleep(0.0001)
+    outimage[]
 end
 

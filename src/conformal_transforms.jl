@@ -11,5 +11,6 @@ function identity_mobius()
     MobiusTransform{Float64}(1, 0, 0, 1)
 end
 
-function transform()
+function transform(mobius::MobiusTransform{T}, point::Complex{T})::Complex{T} where {T <: Real}
+    (point * mobius.a + mobius.b) / (point * mobius.c + mobius.d)
 end

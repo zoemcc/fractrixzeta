@@ -6,12 +6,18 @@ struct Game{GameState <: AbstractGameState, Renderer <: AbstractRenderer, InputH
     config::Config
 end
 
-function initgame()
+function init_game()
     # do basic shit first
+    config = NoConfig()
     gamestate = init_game_state()
     renderer = init_renderer()
     inputhandler = NoInputHandler()
-    config = NoConfig()
     Game(gamestate, renderer, inputhandler, config)
+end
+
+function run_game(game::Game)
+    @time for i in 1:10000
+        render_game(game.renderer, game.gamestate)
+    end
 end
 

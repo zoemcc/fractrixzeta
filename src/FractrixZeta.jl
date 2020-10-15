@@ -13,6 +13,7 @@ using Zygote
 import Makie
 import AbstractPlotting.MakieLayout
 import AbstractPlotting
+using MacroTools
 
 tau = 2pi
 τ = tau
@@ -28,7 +29,9 @@ include("mandelbrot.jl")
 include("game.jl")
 
 function main()
-    initgame()
+    game = init_game()
+    run_game(game)
+    game
 end
 
 end

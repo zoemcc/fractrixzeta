@@ -1,3 +1,3 @@
 using FractrixZeta
 
-FractrixZeta.main()
+game = FractrixZeta.main()
