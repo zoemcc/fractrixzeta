@@ -15,9 +15,9 @@ import AbstractPlotting.MakieLayout
 import AbstractPlotting
 using MacroTools
 
-tau = 2pi
-τ = tau
-TAU = τ
+const tau = 2pi
+const τ = tau
+const TAU = τ
 
 include("conformal_transforms.jl")
 include("lantern.jl")
@@ -31,7 +31,7 @@ include("game.jl")
 function main()
     game = init_game()
     run_game(game)
-    game
+    #game
 end
 
 end

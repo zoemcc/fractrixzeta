@@ -1,10 +1,18 @@
 abstract type AbstractConformalTransform end
 
-struct MobiusTransform{T <: Real} <: AbstractConformalTransform
+mutable struct MobiusTransform{T <: Real} <: AbstractConformalTransform
     a::Complex{T}
     b::Complex{T}
     c::Complex{T}
     d::Complex{T}
+end
+
+function addequals(mobius::MobiusTransform{T}, sv::SArray{Tuple{4},Complex{Float64},1,4}) where {T <: Real}
+    mobius.a += sv[1]
+    mobius.b += sv[2]
+    mobius.c += sv[3]
+    mobius.d += sv[4]
+    mobius
 end
 
 function identity_mobius()

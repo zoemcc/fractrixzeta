@@ -13,7 +13,7 @@ end
 
 function init_renderer()
     scene = Makie.Scene()
-    height = 720
+    height = 360
     aspectratio = 16/9
     width = Int(floor(height * aspectratio))
     numiters = 250
@@ -41,8 +41,9 @@ function render_game(renderer::MakieRenderer, gamestate::AbstractGameState)
     numblocks = ceil(Int, width / numthreads[1]), ceil(Int, height / numthreads[2])
 
     # GameState parameters
-    centerx, centery = position(player(gamestate)) .+ 0.4 .* randn.()
-    rotationfactor, scalefactor = rotation(player(gamestate)) + 0.5 * randn(), scale(player(gamestate)) + 0.5 * randn()
+    centerx, centery = position(player(gamestate)) #.+ 0.4 .* randn.()
+    #rotationfactor, scalefactor = rotation(player(gamestate)) + 0.5 * randn(), scale(player(gamestate)) + 0.5 * randn()
+    rotationfactor, scalefactor = rotation(player(gamestate)), scale(player(gamestate))
 
     expscale = numtype(2 ^ -scalefactor)
     yrangeextent = numtype(expscale)
@@ -63,7 +64,7 @@ function render_game(renderer::MakieRenderer, gamestate::AbstractGameState)
     end
 
     CUDA.copyto!(outimage[], cudaimage)
-    @time Observables.notify!(outimage)
+    Observables.notify!(outimage)
     sleep(0.0001)
     outimage[]
 end

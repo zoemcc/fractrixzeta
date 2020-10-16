@@ -33,7 +33,7 @@ function init_player_state()
     T = Float64
     pos = Point2{T}(0, 0)
     rot = T(0)
-    scale = T(0)
+    scale = T(-3)
     PlayerStateNoResource(pos, rot, scale)
 end
 
