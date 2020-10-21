@@ -9,7 +9,9 @@ using VideoIO
 using StaticArrays
 using Observables
 using CUDA
+using StructArrays
 using Zygote
+using Parameters
 import Makie
 import AbstractPlotting.MakieLayout
 import AbstractPlotting
@@ -21,9 +23,9 @@ const TAU = τ
 
 include("conformal_transforms.jl")
 include("lantern.jl")
+include("inputhandler.jl")
 include("state.jl")
 include("renderer.jl")
-include("inputhandler.jl")
 include("config.jl")
 include("mandelbrot.jl")
 include("game.jl")
@@ -31,7 +33,7 @@ include("game.jl")
 function main()
     game = init_game()
     run_game(game)
-    #game
+    game
 end
 
 end

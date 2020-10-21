@@ -11,6 +11,8 @@ struct MakieRenderer <: AbstractRenderer
     width::Int64
 end
 
+scene(renderer::MakieRenderer) = renderer.scene
+
 function init_renderer()
     scene = Makie.Scene()
     height = 360

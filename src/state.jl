@@ -19,7 +19,12 @@ function init_game_state()
     GameState(init_player_state(), init_player_state_history(), init_world_state())
 end
 
-struct PlayerStateNoResource{T <: Real, Point <: AbstractPoint{2, T}} <: AbstractPlayerState
+function timestep_game_state(gamestate::GameState, currentintent::Vector{OneIntent}, deltatime::Float64)
+    timestep_player_state(gamestate.player_state, currentintent, deltatime)
+
+end
+
+mutable struct PlayerStateNoResource{T <: Real, Point <: AbstractPoint{2, T}} <: AbstractPlayerState
     position::Point
     rotation::T
     scale::T
@@ -35,6 +40,40 @@ function init_player_state()
     rot = T(0)
     scale = T(-3)
     PlayerStateNoResource(pos, rot, scale)
+end
+
+function timestep_player_state(playerstate::PlayerStateNoResource{Float64, Point2{Float64}}, currentintent::Vector{OneIntent}, deltatime::Float64)
+    numtype = Float64
+    expscale = numtype(2.0 ^ -playerstate.scale)
+    cosrot = numtype(cos(playerstate.rotation))
+    sinrot = numtype(sin(playerstate.rotation))
+    for i in eachindex(currentintent)
+        @unpack playerintent, scale, intended = currentintent[i]
+        if intended
+            # basically a switch statement
+            if playerintent == moveforward
+                playerstate.position += @SVector [-sinrot * scale * expscale * deltatime, 
+                                                   cosrot * scale * expscale * deltatime]
+            elseif playerintent == movebackward
+                playerstate.position -= @SVector [-sinrot * scale * expscale * deltatime, 
+                                                   cosrot * scale * expscale * deltatime]
+            elseif playerintent == moveleft
+                playerstate.position -= @SVector [cosrot * scale * expscale * deltatime, 
+                                                  sinrot * scale * expscale * deltatime]
+            elseif playerintent == moveright
+                playerstate.position += @SVector [cosrot * scale * expscale * deltatime, 
+                                                  sinrot * scale * expscale * deltatime]
+            elseif playerintent == zoomout
+                playerstate.scale -= scale * deltatime
+            elseif playerintent == zoomin
+                playerstate.scale += scale * deltatime
+            elseif playerintent == rotateleft
+                playerstate.rotation += scale * deltatime
+            elseif playerintent == rotateright
+                playerstate.rotation -= scale * deltatime
+            end
+        end
+    end
 end
 
 struct PlayerStateHistoryBasic{Player <: AbstractPlayerState} <: AbstractPlayerStateHistory
