@@ -16,17 +16,22 @@ function init_game()
 end
 
 function run_game(game::Game)
-    newlantern = DistanceGoalLantern(Complex(-1.4, 0.0), Complex(0.7, 0.7))
+    newlantern = DistanceGoalLantern(Complex(0.7, 0.7), Complex(-1.4, 0.0))
     lasttime = time()
     
     stoprenderloopindex = game.inputhandler.playerintentindex[stoprenderloop]
     plantlanternindex = game.inputhandler.playerintentindex[plantlantern]
+    alreadychangedlanatern = false
     while true
         if game.inputhandler.currentintent[stoprenderloopindex].intended
             break
         else
-            if game.inputhandler.currentintent[plantlanternindex].intended
-                newlantern = DistanceGoalLantern(Complex(-1.4, 0.0), Complex(randn(Float64, 2)...))
+            if game.inputhandler.currentintent[plantlanternindex].intended && !alreadychangedlanatern
+                newlantern = DistanceGoalLantern(Complex(randn(Float64, 2)...), Complex(-1.4, 0.0))
+                @show newlantern.startpoint
+                alreadychangedlanatern = true
+            elseif !game.inputhandler.currentintent[plantlanternindex].intended
+                alreadychangedlanatern = false
             end
             nowtime = time()
             deltatime = nowtime - lasttime
@@ -34,7 +39,7 @@ function run_game(game::Game)
             timestep_game_state(game.gamestate, game.inputhandler.currentintent, deltatime)
 
             render_game(game.renderer, game.gamestate) 
-            new_transform = evolvetransform(newlantern, game.gamestate.worldstate.current_transform)
+            new_transform = evolvetransform(newlantern, game.gamestate.worldstate.current_transform, game.gamestate.player_state)
         end
     end
     game

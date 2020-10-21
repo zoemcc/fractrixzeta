@@ -1,8 +1,3 @@
-abstract type AbstractGameState end
-abstract type AbstractPlayerState end
-abstract type AbstractPlayerStateHistory end
-abstract type AbstractWorldState end
-
 struct GameState{Player <: AbstractPlayerState, 
         PlayerStateHistory <: AbstractPlayerStateHistory, 
         W <: AbstractWorldState} <: AbstractGameState
@@ -24,8 +19,8 @@ function timestep_game_state(gamestate::GameState, currentintent::Vector{OneInte
 
 end
 
-mutable struct PlayerStateNoResource{T <: Real, Point <: AbstractPoint{2, T}} <: AbstractPlayerState
-    position::Point
+mutable struct PlayerStateNoResource{T <: Real} <: AbstractPlayerState
+    position::Complex{T}
     rotation::T
     scale::T
 end
@@ -36,15 +31,15 @@ scale(player::PlayerStateNoResource) = player.scale
 
 function init_player_state()
     T = Float64
-    pos = Point2{T}(0, 0)
+    pos = Complex{T}(0, 0)
     rot = T(0)
     scale = T(-3)
     PlayerStateNoResource(pos, rot, scale)
 end
 
-function timestep_player_state(playerstate::PlayerStateNoResource{Float64, Point2{Float64}}, currentintent::Vector{OneIntent}, deltatime::Float64)
+function timestep_player_state(playerstate::PlayerStateNoResource{Float64}, currentintent::Vector{OneIntent}, deltatime::Float64)
     numtype = Float64
-    expscale = numtype(2.0 ^ -playerstate.scale)
+    expscale = numtype(2 ^ -playerstate.scale)
     cosrot = numtype(cos(playerstate.rotation))
     sinrot = numtype(sin(playerstate.rotation))
     for i in eachindex(currentintent)
@@ -52,17 +47,17 @@ function timestep_player_state(playerstate::PlayerStateNoResource{Float64, Point
         if intended
             # basically a switch statement
             if playerintent == moveforward
-                playerstate.position += @SVector [-sinrot * scale * expscale * deltatime, 
-                                                   cosrot * scale * expscale * deltatime]
+                playerstate.position += Complex(-sinrot * scale * expscale * deltatime, 
+                                                 cosrot * scale * expscale * deltatime)
             elseif playerintent == movebackward
-                playerstate.position -= @SVector [-sinrot * scale * expscale * deltatime, 
-                                                   cosrot * scale * expscale * deltatime]
+                playerstate.position -= Complex(-sinrot * scale * expscale * deltatime, 
+                                                 cosrot * scale * expscale * deltatime)
             elseif playerintent == moveleft
-                playerstate.position -= @SVector [cosrot * scale * expscale * deltatime, 
-                                                  sinrot * scale * expscale * deltatime]
+                playerstate.position -= Complex(cosrot * scale * expscale * deltatime, 
+                                                sinrot * scale * expscale * deltatime)
             elseif playerintent == moveright
-                playerstate.position += @SVector [cosrot * scale * expscale * deltatime, 
-                                                  sinrot * scale * expscale * deltatime]
+                playerstate.position += Complex(cosrot * scale * expscale * deltatime, 
+                                                sinrot * scale * expscale * deltatime)
             elseif playerintent == zoomout
                 playerstate.scale -= scale * deltatime
             elseif playerintent == zoomin
@@ -81,7 +76,7 @@ struct PlayerStateHistoryBasic{Player <: AbstractPlayerState} <: AbstractPlayerS
 end
 
 function init_player_state_history()
-    PlayerStateHistoryBasic(Array{PlayerStateNoResource{Float64, GeometryBasics.Point2{Float64}}, 1}(undef, 0))
+    PlayerStateHistoryBasic(Array{PlayerStateNoResource{Float64}, 1}(undef, 0))
 end
 
 struct WorldStateBasic{T <: Real, 

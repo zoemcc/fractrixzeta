@@ -1,5 +1,3 @@
-abstract type AbstractConformalTransform end
-
 mutable struct MobiusTransform{T <: Real} <: AbstractConformalTransform
     a::Complex{T}
     b::Complex{T}
@@ -21,4 +19,8 @@ end
 
 function transform(mobius::MobiusTransform{T}, point::Complex{T})::Complex{T} where {T <: Real}
     (point * mobius.a + mobius.b) / (point * mobius.c + mobius.d)
+end
+
+function inversetransform(mobius::MobiusTransform{T}, point::Complex{T})::Complex{T} where {T <: Real}
+    (point * mobius.d - mobius.b) / (-point * mobius.c + mobius.a)
 end

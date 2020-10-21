@@ -388,12 +388,16 @@ function mandelbrotandregiongpu!(escape_color, centerx::N, xstart::N, xrangeexte
 end
 
 function mobiustransform(z::Complex{N}, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N})::Complex{N} where {N <: Real}
-    return (z * a + b) / (z * c + d)
+    (z * a + b) / (z * c + d)
 end
 
 
 function complexdist(z1::Complex{N}, z2::Complex{N})::N where {N <: Real}
-    return abs(z1 - z2)
+    abs(z1 - z2)
+end
+
+function complexdistsq(z1::Complex{N}, z2::Complex{N})::N where {N <: Real}
+    real(((z1 - z2) * conj(z1 - z2)))
 end
 
 function diskmobius(lambdaangle::N, a::Complex{N}) where {N <: Real}

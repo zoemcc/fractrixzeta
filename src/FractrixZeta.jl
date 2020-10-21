@@ -1,5 +1,6 @@
 module FractrixZeta
 
+using MacroTools
 using LightGraphs
 using GeometryBasics
 using FileIO
@@ -21,10 +22,11 @@ const tau = 2pi
 const τ = tau
 const TAU = τ
 
+include("abstracttypes.jl")
 include("conformal_transforms.jl")
-include("lantern.jl")
 include("inputhandler.jl")
 include("state.jl")
+include("lantern.jl")
 include("renderer.jl")
 include("config.jl")
 include("mandelbrot.jl")

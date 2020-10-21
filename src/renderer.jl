@@ -43,7 +43,8 @@ function render_game(renderer::MakieRenderer, gamestate::AbstractGameState)
     numblocks = ceil(Int, width / numthreads[1]), ceil(Int, height / numthreads[2])
 
     # GameState parameters
-    centerx, centery = position(player(gamestate)) #.+ 0.4 .* randn.()
+    center = position(player(gamestate))
+    centerx, centery = real(center), imag(center) #.+ 0.4 .* randn.()
     #rotationfactor, scalefactor = rotation(player(gamestate)) + 0.5 * randn(), scale(player(gamestate)) + 0.5 * randn()
     rotationfactor, scalefactor = rotation(player(gamestate)), scale(player(gamestate))
 

@@ -1,8 +1,3 @@
-abstract type AbstractInputHandler end
-
-
-@enum PLAYERINTENT moveforward=1 movebackward=2 moveleft=3 moveright=4 zoomout=5 zoomin=6 rotateleft=7 rotateright=8 plantlantern=9 stoprenderloop=10
-
 @with_kw mutable struct OneIntent
     playerintent::PLAYERINTENT
     keybutton::AbstractPlotting.Keyboard.Button
@@ -48,7 +43,7 @@ function generate_input_handler(events::AbstractPlotting.Events, currentintent::
             @unpack keybutton = currentintent[i]
             currentintent[i].intended = keybutton in but
         end
-        @show currentintent
+        #@show currentintent
         nothing
     end
 
