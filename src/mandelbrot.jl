@@ -387,6 +387,25 @@ function mandelbrotandregiongpu!(escape_color, centerx::N, xstart::N, xrangeexte
     return nothing
 end
 
+function mandelbrotandregiongpurational!(escape_color, centerx::T, xstart::T, xrangeextent::T, centery::T, ystart::T, yrangeextent::T, 
+        numiters, height, width, cosrot::T, sinrot::T, rational::ComplexRational{T, N}) where {T <: Real, N}
+    indexx = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    indexy = (blockIdx().y - 1) * blockDim().y + threadIdx().y
+    stridex = blockDim().x * gridDim().x
+    stridey = blockDim().y * gridDim().y
+    #@cuprintln("thread $indexx, $indexy, stride $stridex, $stridey, weight $width $height")
+    for i in indexx:stridex:width, j in indexy:stridey:height
+        prex_ij = (i - 1) / (width - 1) * xrangeextent + xstart
+        prey_ij = (j - 1) / (height - 1) * yrangeextent + ystart
+        z_ij = Complex{T}(cosrot * prex_ij - sinrot * prey_ij + centerx, sinrot * prex_ij + cosrot * prey_ij + centery)
+        z_ij_rational = transform(rational, z_ij)
+        escape_ij = mandelbrot(z_ij_rational, numiters) / numiters
+        escape_ij_f32 = Float32(escape_ij)
+        @inbounds escape_color[i, j] = ColorTypes.RGBA{Float32}(escape_ij_f32, escape_ij_f32, escape_ij_f32)
+    end
+    return nothing
+end
+
 function mobiustransform(z::Complex{N}, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N})::Complex{N} where {N <: Real}
     (z * a + b) / (z * c + d)
 end
@@ -430,12 +449,26 @@ function gpu_add3!(y, x)
     return nothing
 end
 
+function gpu_rational!(y, x, ct)
+    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    stride = blockDim().x * gridDim().x
+    #numpol = @SVector ComplexF64[1 + 0.2im, 1, 0.2 - 0.25im]
+    for i in index:stride:length(y)
+        #@inbounds y[i] = evalpoly(x[i], ct.numerator) / evalpoly(x[i], ct.denominator)
+        @inbounds y[i] = transform(ct, x[i])
+    end
+    return nothing
+end
+
 function cudastuff()
     N = 1024
-    x = CUDA.fill(1., N)
-    y = CUDA.fill(2., N)
+    x = CUDA.fill(ComplexF64(1.3, 0), N)
+    y = CUDA.fill(ComplexF64(0, 0), N)
     numblocks = ceil(Int, N/256)
-    @cuda threads=256 blocks=numblocks gpu_add3!(y, x)
+    numpol = @SVector ComplexF64[1, 1 + 0.1im]
+    denpol = @SVector ComplexF64[2, 0]
+    rat = ComplexRational(numpol, denpol)
+    @cuda threads=256 blocks=numblocks gpu_rational!(y, x, rat)
     @show y
 end
 

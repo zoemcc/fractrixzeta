@@ -29,7 +29,7 @@ defaultkeyboardmapping() = [
                             OneIntent(playerintent=zoomin, keybutton=Makie.Keyboard.k, scale=zoomscale),
                             OneIntent(playerintent=rotateleft, keybutton=Makie.Keyboard.q, scale=rotscale),
                             OneIntent(playerintent=rotateright, keybutton=Makie.Keyboard.e, scale=rotscale),
-                            OneIntent(playerintent=plantlantern, keybutton=Makie.Keyboard.l),
+                            OneIntent(playerintent=plantlighthouse, keybutton=Makie.Keyboard.l),
                             OneIntent(playerintent=stoprenderloop, keybutton=Makie.Keyboard.p),
                             ]
 
@@ -38,7 +38,7 @@ function generate_input_handler(events::AbstractPlotting.Events, currentintent::
 
     # input processor
     callback = Makie.lift(events.keyboardbuttons) do but
-        @show but
+        #@show but
         for i in eachindex(currentintent)
             @unpack keybutton = currentintent[i]
             currentintent[i].intended = keybutton in but

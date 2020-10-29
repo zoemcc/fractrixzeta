@@ -2,6 +2,7 @@ module FractrixZeta
 
 using MacroTools
 using LightGraphs
+using LinearAlgebra
 using GeometryBasics
 using FileIO
 using Dates
@@ -26,7 +27,7 @@ include("abstracttypes.jl")
 include("conformal_transforms.jl")
 include("inputhandler.jl")
 include("state.jl")
-include("lantern.jl")
+include("lighthouse.jl")
 include("renderer.jl")
 include("config.jl")
 include("mandelbrot.jl")
@@ -50,7 +51,7 @@ AbstractGameState abstract type
 AbstractPlayerState abstract type 
 AbstractWorldState abstract type 
 AbstractConformalTransform abstract type 
-AbstractLantern abstract type
+AbstractLightHouse abstract type
 AbstractRenderer abstract type
 
 GameState struct <: AbstractGameState
@@ -68,7 +69,7 @@ GameState struct <: AbstractGameState
 
     WorldState <: AbstractWorldState
         Current Transform
-        Lantern graph
+        LightHouse graph
             history of transforms to warp between spaces
         SimTime
     end

@@ -9,12 +9,13 @@ struct MakieRenderer <: AbstractRenderer
     aspectratio::Float64
     height::Int64
     width::Int64
+    #camera::AbstractPlotting::Camera2D
 end
 
 scene(renderer::MakieRenderer) = renderer.scene
 
 function init_renderer()
-    scene = Makie.Scene()
+    #scene = Makie.Scene()
     height = 360
     aspectratio = 16/9
     width = Int(floor(height * aspectratio))
@@ -22,9 +23,35 @@ function init_renderer()
     xrange, yrange, mandelimg = rendermandelbrotimagecuda(0., 0., 0., numiters, height, aspectratio) 
     mandelimgcolor = [ColorTypes.RGBA(Float32(color), Float32(color), Float32(color)) for color in mandelimg]
     cudaimage = CUDA.CuArray(mandelimgcolor)
-    Makie.image!(scene, mandelimgcolor, show_axis=false)
+
+    #cam = 
+
+    #Node = Observables.Node
+    #camera = AbstractPlotting.Camera2D(AbstractPlotting.Node(FRect(0,0,width,height)), AbstractPlotting.Node(0.0f0), 
+        #AbstractPlotting.Node(nothing), AbstractPlotting.Node(nothing), AbstractPlotting.Node(0.0f0), 
+        #AbstractPlotting.Node(Vec{2, Int}(width, height)), AbstractPlotting.Node(false))
+    theme = AbstractPlotting.Attributes(show_axis=false, raw=false, scale_plot=true, 
+                        padding=Point3(0.0f0, 0.0f0, 0.0f0), 
+                        align= (:middle, :middle),
+                        #resolution=(640, 360), #limits=FRect(0, 0, 640, 360),
+                        panbutton=nothing, update_limits=true)
+    AbstractPlotting.set_theme!(theme)
+
+    scene = Makie.image(mandelimgcolor)
+    #cam = AbstractPlotting.cam2d!(scene; padding=0.000, area=AbstractPlotting.Node(FRect(0,0,width,height)))
+    #cam = AbstractPlotting.cam2d!(scene; padding=0.000, area=AbstractPlotting.Node(FRect(0,0,width,height)))
+    #AbstractPlotting.update_cam!(scene, cam)
+    #AbstractPlotting.update!(scene)
     display(scene)
+    #AbstractPlotting.update_cam!(scene)
+    #AbstractPlotting.update!(scene)
+    #display(scene)
     image = scene.plots[1][:image]
+    Observables.notify!(image)
+    #AbstractPlotting.update_cam!(scene, camera)
+    cam = AbstractPlotting.cam2d!(scene; padding=0.000, area=AbstractPlotting.Node(FRect(0,0,width,height)), 
+        panbutton=nothing, update_limits=true)
+    AbstractPlotting.update_cam!(scene, cam)
     MakieRenderer(scene, image, cudaimage, numiters, aspectratio, height, width)
 end
 
@@ -56,18 +83,23 @@ function render_game(renderer::MakieRenderer, gamestate::AbstractGameState)
     cosrot = numtype(cos(rotationfactor))
     sinrot = numtype(sin(rotationfactor))
 
-    mobius = current_transform(world(gamestate))
-    a, b, c, d = mobius.a, mobius.b, mobius.c, mobius.d
+    #mobius = current_transform(world(gamestate))
+    conformal = current_transform(world(gamestate))
+    #a, b, c, d = mobius.a, mobius.b, mobius.c, mobius.d
 
     # then call 
     CUDA.@sync begin
-        @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(cudaimage,
+        #@cuda threads=numthreads blocks=numblocks mandelbrotandregiongpu!(cudaimage,
+            #centerx, xstart, xrangeextent, centery, ystart, yrangeextent,
+            #numiters, height, width, cosrot, sinrot, a, b, c, d)
+        @cuda threads=numthreads blocks=numblocks mandelbrotandregiongpurational!(cudaimage,
             centerx, xstart, xrangeextent, centery, ystart, yrangeextent,
-            numiters, height, width, cosrot, sinrot, a, b, c, d)
+            numiters, height, width, cosrot, sinrot, conformal)
     end
 
     CUDA.copyto!(outimage[], cudaimage)
     Observables.notify!(outimage)
+    #AbstractPlotting.update_cam!(renderer.scene)
     sleep(0.0001)
     outimage[]
 end
