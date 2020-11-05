@@ -318,18 +318,21 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         adisk += (adisktarget - adisk) * deltatime
         #a, b, c, d = diskmobius(lambdaangle, adisk)
 
-        distfunc = mobiusparams -> complexdist(mobiustransform(z1, mobiusparams...), z2)
-        distparams = distfunc(mobiusparams)
-        gradmobius = gradient(distfunc, mobiusparams)[1]
-        mobiusparams .-= gradmobius .* lr .* distparams
+        #@show "optimization"
+        begin 
+            distfunc = mobiusparams -> complexdist(mobiustransform(z1, mobiusparams...), z2)
+            distparams = distfunc(mobiusparams)
+            gradmobius = gradient(distfunc, mobiusparams)[1]
+            mobiusparams .-= gradmobius .* lr .* distparams
+        end
         if distparams < 1e-3 || l > 100
             z2 = Complex{numtype}(randn(), randn())
             l = 0
         end
         l += 1
         if i % 5 == 0
-            @show distfunc(mobiusparams)
-            @show z2
+            #@show distfunc(mobiusparams)
+            #@show z2
             #@show mobiusparams
             #@show gradmobius
         end
@@ -343,7 +346,7 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
 
         #@show "copy"
         #@time CUDA.copyto!(escape_cpu, escape)
-        CUDA.copyto!(escape_cpu_color, escape_color)
+        CUDA.copyto!(makimg[], escape_color)
 
         #@show "copytocolor"
         #for (l, z) in enumerate(escape_cpu)
@@ -351,7 +354,9 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
         #end
 
         #@show "imageplotcopy"
-        makimg[] = escape_cpu_color
+        #makimg[] = escape_cpu_color
+        Observables.notify!(makimg)
+        #@time makimg.listeners[1](makimg.val)
 
         i += 1
         sleep(0.0001)
@@ -363,9 +368,8 @@ function rendermandelbrotimageanimation2(image, centerx::Float64, centery::Float
     return nothing
 end
 
-#function mandelbrotandregiongpu!(escape, centerx, xstart, xrangeextent, centery, ystart, yrangeextent, numiters, height, width, cosrot, sinrot, a, b, c, d)
 function mandelbrotandregiongpu!(escape_color, centerx::N, xstart::N, xrangeextent::N, centery::N, ystart::N, yrangeextent::N, 
-    numiters, height, width, cosrot::N, sinrot::N, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N}) where {N <: Real}
+        numiters, height, width, cosrot::N, sinrot::N, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N}) where {N <: Real}
     indexx = (blockIdx().x - 1) * blockDim().x + threadIdx().x
     indexy = (blockIdx().y - 1) * blockDim().y + threadIdx().y
     stridex = blockDim().x * gridDim().x
@@ -380,16 +384,39 @@ function mandelbrotandregiongpu!(escape_color, centerx::N, xstart::N, xrangeexte
         escape_ij_f32 = Float32(escape_ij)
         @inbounds escape_color[i, j] = ColorTypes.RGBA{Float32}(escape_ij_f32, escape_ij_f32, escape_ij_f32)
     end
-    return
+    return nothing
+end
+
+function mandelbrotandregiongpurational!(escape_color, centerx::T, xstart::T, xrangeextent::T, centery::T, ystart::T, yrangeextent::T, 
+        numiters, height, width, cosrot::T, sinrot::T, rational::ComplexRational{T, N}) where {T <: Real, N}
+    indexx = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    indexy = (blockIdx().y - 1) * blockDim().y + threadIdx().y
+    stridex = blockDim().x * gridDim().x
+    stridey = blockDim().y * gridDim().y
+    #@cuprintln("thread $indexx, $indexy, stride $stridex, $stridey, weight $width $height")
+    for i in indexx:stridex:width, j in indexy:stridey:height
+        prex_ij = (i - 1) / (width - 1) * xrangeextent + xstart
+        prey_ij = (j - 1) / (height - 1) * yrangeextent + ystart
+        z_ij = Complex{T}(cosrot * prex_ij - sinrot * prey_ij + centerx, sinrot * prex_ij + cosrot * prey_ij + centery)
+        z_ij_rational = transform(rational, z_ij)
+        escape_ij = mandelbrot(z_ij_rational, numiters) / numiters
+        escape_ij_f32 = Float32(escape_ij)
+        @inbounds escape_color[i, j] = ColorTypes.RGBA{Float32}(escape_ij_f32, escape_ij_f32, escape_ij_f32)
+    end
+    return nothing
 end
 
 function mobiustransform(z::Complex{N}, a::Complex{N}, b::Complex{N}, c::Complex{N}, d::Complex{N})::Complex{N} where {N <: Real}
-    return (z * a + b) / (z * c + d)
+    (z * a + b) / (z * c + d)
 end
 
 
 function complexdist(z1::Complex{N}, z2::Complex{N})::N where {N <: Real}
-    return abs(z1 - z2)
+    abs(z1 - z2)
+end
+
+function complexdistsq(z1::Complex{N}, z2::Complex{N})::N where {N <: Real}
+    real(((z1 - z2) * conj(z1 - z2)))
 end
 
 function diskmobius(lambdaangle::N, a::Complex{N}) where {N <: Real}
@@ -422,12 +449,26 @@ function gpu_add3!(y, x)
     return nothing
 end
 
+function gpu_rational!(y, x, ct)
+    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x
+    stride = blockDim().x * gridDim().x
+    #numpol = @SVector ComplexF64[1 + 0.2im, 1, 0.2 - 0.25im]
+    for i in index:stride:length(y)
+        #@inbounds y[i] = evalpoly(x[i], ct.numerator) / evalpoly(x[i], ct.denominator)
+        @inbounds y[i] = transform(ct, x[i])
+    end
+    return nothing
+end
+
 function cudastuff()
     N = 1024
-    x = CUDA.fill(1., N)
-    y = CUDA.fill(2., N)
+    x = CUDA.fill(ComplexF64(1.3, 0), N)
+    y = CUDA.fill(ComplexF64(0, 0), N)
     numblocks = ceil(Int, N/256)
-    @cuda threads=256 blocks=numblocks gpu_add3!(y, x)
+    numpol = @SVector ComplexF64[1, 1 + 0.1im]
+    denpol = @SVector ComplexF64[2, 0]
+    rat = ComplexRational(numpol, denpol)
+    @cuda threads=256 blocks=numblocks gpu_rational!(y, x, rat)
     @show y
 end
 

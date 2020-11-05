@@ -1,6 +1,9 @@
 module FractrixZeta
 
+using MacroTools
 using LightGraphs
+using Optim
+using LinearAlgebra
 using GeometryBasics
 using FileIO
 using Dates
@@ -9,18 +12,33 @@ using VideoIO
 using StaticArrays
 using Observables
 using CUDA
+using StructArrays
 using Zygote
+using Parameters
 import Makie
 import AbstractPlotting.MakieLayout
 import AbstractPlotting
+using MacroTools
 
-tau = 2pi
-τ = tau
-TAU = τ
+const tau = 2pi
+const τ = tau
+const TAU = τ
 
+include("abstracttypes.jl")
+include("conformal_transforms.jl")
+include("inputhandler.jl")
 include("state.jl")
+include("lighthouse.jl")
 include("renderer.jl")
+include("config.jl")
 include("mandelbrot.jl")
+include("game.jl")
+
+function main()
+    game = init_game()
+    run_game(game)
+    game
+end
 
 end
 
@@ -34,7 +52,7 @@ AbstractGameState abstract type
 AbstractPlayerState abstract type 
 AbstractWorldState abstract type 
 AbstractConformalTransform abstract type 
-AbstractLantern abstract type
+AbstractLightHouse abstract type
 AbstractRenderer abstract type
 
 GameState struct <: AbstractGameState
@@ -52,7 +70,7 @@ GameState struct <: AbstractGameState
 
     WorldState <: AbstractWorldState
         Current Transform
-        Lantern graph
+        LightHouse graph
             history of transforms to warp between spaces
         SimTime
     end

@@ -1,8 +1,15 @@
 implement a lot more loss functions
 implement initial travel map via graphs
-refactor all the code so that it's a lot more separated (rendering, computation, tests)
-gamestate data structure
-
+    propagate player position via the inverse transform
+        save pos_mb = transform(pos)
+        for i in transforms
+            pos_i = inverse_i (pos_mb)
+!refactor all the code so that it's a lot more separated (rendering, computation, tests)
+!gamestate data structure
+    !rendering
+    !transforming
+    !input
+    
 
     
 

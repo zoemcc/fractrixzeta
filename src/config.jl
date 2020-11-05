@@ -1,0 +1,1 @@
+struct NoConfig <: AbstractConfig end
