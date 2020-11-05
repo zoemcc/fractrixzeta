@@ -36,7 +36,7 @@ function run_game(game::Game)
             nowtime = time()
             deltatime = nowtime - lasttime
             lasttime = nowtime
-            timestep_game_state(game.gamestate, game.inputhandler.currentintent, deltatime)
+            timestep_game_state(game.gamestate, game.inputhandler.currentintent, game.gamestate.worldstate.current_transform, deltatime)
 
             render_game(game.renderer, game.gamestate) 
             game.gamestate.worldstate.current_transform = evolvetransform(newlantern, game.gamestate.worldstate.current_transform, game.gamestate.player_state)

@@ -9,11 +9,11 @@ end
 function evolvetransform(lantern::DistanceGoalLightHouse{T}, current_transform::MobiusTransform{T}, playerstate::PlayerStateNoResource) where {T <: Real}
     distfunc = mobius -> complexdistsq(transform(mobius, lantern.startpoint), lantern.goalpoint)
     #@show playerstate
-    mapped_orig_player_pos = transform(current_transform, playerstate.position)
+    mapped_orig_player_pos = transform(current_transform, playerstate.preimage_position)
 
     num_steps = 1
-    unmapped_player_pos = Vector{Complex{T}}(undef, num_steps + 1)
-    unmapped_player_pos[1] = playerstate.position
+    preimage_player_pos_arr = Vector{Complex{T}}(undef, num_steps + 1)
+    preimage_player_pos_arr[1] = playerstate.preimage_position
     lr = 0.005
     for l in 1:num_steps
         distparams = distfunc(current_transform)
@@ -21,20 +21,20 @@ function evolvetransform(lantern::DistanceGoalLightHouse{T}, current_transform::
         gradmobiusSV = SVector(gradmobius...)
 
         addequals(current_transform, -lr .* gradmobiusSV)
-        unmapped_player_pos[l + 1] = inversetransform(current_transform, mapped_orig_player_pos)
+        preimage_player_pos_arr[l + 1] = inversetransform(current_transform, mapped_orig_player_pos)
     end
-    playerstate.position = unmapped_player_pos[end]
+    playerstate.preimage_position = preimage_player_pos_arr[end]
     current_transform
 end
 
 function evolvetransform(lantern::DistanceGoalLightHouse{T}, current_transform::ComplexRational{T, N}, playerstate::PlayerStateNoResource) where {T <: Real, N}
     distfunc = conformal -> complexdistsq(transform(conformal, lantern.startpoint), lantern.goalpoint)
     #@show playerstate
-    mapped_orig_player_pos = transform(current_transform, playerstate.position)
+    mapped_orig_player_pos = playerstate.mandel_position
 
     num_steps = 1
-    unmapped_player_pos = Vector{Complex{T}}(undef, num_steps + 1)
-    unmapped_player_pos[1] = playerstate.position
+    preimage_player_pos_arr = Vector{Complex{T}}(undef, num_steps + 1)
+    preimage_player_pos_arr[1] = playerstate.preimage_position
     lr = 0.005
     for l in 1:num_steps
         distparams = distfunc(current_transform)
@@ -48,10 +48,9 @@ function evolvetransform(lantern::DistanceGoalLightHouse{T}, current_transform::
         #gradmobiusSV = SVector(gradmobius...)
 
         #addequals(current_transform, -lr .* gradmobiusSV)
-        #unmapped_player_pos[l + 1] = inversetransform(current_transform, mapped_orig_player_pos)
-        unmapped_player_pos[l + 1] = playerstate.position
+        preimage_player_pos_arr[l + 1] = inversetransform(current_transform, mapped_orig_player_pos, preimage_player_pos_arr[l])
     end
-    playerstate.position = unmapped_player_pos[end]
+    playerstate.preimage_position = preimage_player_pos_arr[end]
     current_transform
 end
 

@@ -14,30 +14,33 @@ function init_game_state()
     GameState(init_player_state(), init_player_state_history(), init_world_state())
 end
 
-function timestep_game_state(gamestate::GameState, currentintent::Vector{OneIntent}, deltatime::Float64)
-    timestep_player_state(gamestate.player_state, currentintent, deltatime)
+function timestep_game_state(gamestate::GameState, currentintent::Vector{OneIntent}, current_transform::AbstractConformalTransform, deltatime::Float64)
+    timestep_player_state(gamestate.player_state, currentintent, current_transform, deltatime)
 
 end
 
 mutable struct PlayerStateNoResource{T <: Real} <: AbstractPlayerState
-    position::Complex{T}
+    preimage_position::Complex{T}
+    mandel_position::Complex{T}
     rotation::T
     scale::T
 end
 
-position(player::PlayerStateNoResource) = player.position
+preimage_position(player::PlayerStateNoResource) = player.preimage_position
+mandel_position(player::PlayerStateNoResource) = player.mandel_position
 rotation(player::PlayerStateNoResource) = player.rotation
 scale(player::PlayerStateNoResource) = player.scale
 
 function init_player_state()
     T = Float64
-    pos = Complex{T}(0, 0)
+    preimage_pos = Complex{T}(0, 0)
+    mandel_pos = Complex{T}(0, 0)
     rot = T(0)
     scale = T(-3)
-    PlayerStateNoResource(pos, rot, scale)
+    PlayerStateNoResource(preimage_pos, mandel_pos, rot, scale)
 end
 
-function timestep_player_state(playerstate::PlayerStateNoResource{Float64}, currentintent::Vector{OneIntent}, deltatime::Float64)
+function timestep_player_state(playerstate::PlayerStateNoResource{Float64}, currentintent::Vector{OneIntent}, current_transform::AbstractConformalTransform, deltatime::Float64)
     numtype = Float64
     expscale = numtype(2 ^ -playerstate.scale)
     cosrot = numtype(cos(playerstate.rotation))
@@ -47,17 +50,21 @@ function timestep_player_state(playerstate::PlayerStateNoResource{Float64}, curr
         if intended
             # basically a switch statement
             if playerintent == moveforward
-                playerstate.position += Complex(-sinrot * scale * expscale * deltatime, 
+                playerstate.preimage_position += Complex(-sinrot * scale * expscale * deltatime, 
                                                  cosrot * scale * expscale * deltatime)
+                playerstate.mandel_position = transform(current_transform, playerstate.preimage_position)
             elseif playerintent == movebackward
-                playerstate.position -= Complex(-sinrot * scale * expscale * deltatime, 
+                playerstate.preimage_position -= Complex(-sinrot * scale * expscale * deltatime, 
                                                  cosrot * scale * expscale * deltatime)
+                playerstate.mandel_position = transform(current_transform, playerstate.preimage_position)
             elseif playerintent == moveleft
-                playerstate.position -= Complex(cosrot * scale * expscale * deltatime, 
+                playerstate.preimage_position -= Complex(cosrot * scale * expscale * deltatime, 
                                                 sinrot * scale * expscale * deltatime)
+                playerstate.mandel_position = transform(current_transform, playerstate.preimage_position)
             elseif playerintent == moveright
-                playerstate.position += Complex(cosrot * scale * expscale * deltatime, 
+                playerstate.preimage_position += Complex(cosrot * scale * expscale * deltatime, 
                                                 sinrot * scale * expscale * deltatime)
+                playerstate.mandel_position = transform(current_transform, playerstate.preimage_position)
             elseif playerintent == zoomout
                 playerstate.scale -= scale * deltatime
             elseif playerintent == zoomin

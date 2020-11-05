@@ -2,6 +2,7 @@ module FractrixZeta
 
 using MacroTools
 using LightGraphs
+using Optim
 using LinearAlgebra
 using GeometryBasics
 using FileIO

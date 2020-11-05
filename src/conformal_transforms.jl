@@ -63,3 +63,12 @@ end
     num / den
 end
 
+@inline function inversetransform(rational::ComplexRational{T, N}, point::Complex{T}, preimage_start::Complex{T})::Complex{T} where {T <: Real, N}
+    # need to do the math in vector-of-real space instead of complex space for Optim's sake
+    preimage_arr = [real(preimage_start), imag(preimage_start)]
+    distinvfunc = preimage -> complexdistsq(transform(rational, Complex(preimage[1], preimage[2])), point)
+    graddistinv = preimage -> gradient(distinvfunc, preimage)[1]
+    optim_results = optimize(distinvfunc, graddistinv, preimage_arr, LBFGS(); inplace=false)
+    preimage_final_complex = Complex(Optim.minimizer(optim_results)...)
+end
+
